@@ -50,26 +50,103 @@ if [[ ! -e "$targetdir" ]]; then
 fi
 
 case $component in 
-	ceph) ### Ceph General ###
+	keystone) 
+		declare -a Log=(	"/var/log/keystone/*.log" \
+				)
+		declare -a Cfg=(	"/etc/keystone/keystone.conf" \
+				)
+		declare -a Svc=(	"apache2.service" \
+				)
+		declare -a Cmd=(	"none"	\
+				)
+	;;
+	horizon)
+		declare -a Log=(	"/var/log/horizon/*.log" \
+				)
+		declare -a Cfg=(	"apache2.service" 	\
+				)
+		declare -a Cmd=(	"netstat -nltp | egrep ':80|:443'" \
+				)
+		declare -a Cfg=(	"/etc/apache/*" \
+	;;	
+	neutron)
+		declare -a Log=(	"/var/log/neutron/openvswitch-agent.log" \
+					"/var/log/neutron/openvswitch-l3-agent.log" \
+				)
+		declare -a Cfg=(	"/etc/neutron/plugins/ml2/ml2_conf.ini" \
+					"/etc/neutron/plugins/ml2/openvswitch_agent.ini" \
+				)
+		declare -a Svc=(	"neutron-openvswitch-agent.service"   \
+				)
+		declare -a Cmd=(	"neutron agent-list"\
+				)
+	;;
+	cinder)
+		declare -a Log=(	"/var/log/cinder/cinder.log"\
+				)
+		declare -a Cfg=(	"/etc/cinder/*" \
+				)
+		declare -a Svc=(	"cinder-scheduler.service" \
+					"cinder-volume.service" \
+				)
+		ceclare -a Cmd=(	"ls /var/lib/cinder/volumes" \
+				)
+	;;
+	ceph) 
+		### Ceph General ###
 		cephLogDir="/var/log/ceph"
 		cephOsdDir="/var/log/ceph"
-		declare -a Cmd=("ceph -s" "ceph health detail" "ceph --version")
-		declare -a Log=("ceph.log")
-		;;
+		declare -a Cmd=(	"ceph -s" \ 
+					"ceph health detail" \
+				       	"ceph --version" \
+					"ceph df" \
+					"ceph pg dump" \
+					"ceph osd tree" \
+				)
+		declare -a Log=(	"ceph.log"\	
+				)
+	;;
+	cephallnodes) 
+		### Run this on all ceph nodes"
+		declare -a Cmd=(	"service ceph status" \ 
+				)
+		declare -a Log=(	"none"\
+				) 
+		declare -a Cfg=(	"/etc/ceph/ceph.conf"\
+				)
+	;;
 
-	cephosd) ### Ceph OSD ###
-		declare -a Log=("")
-		;;
-	nova) 	### Nova ###
-		declare -a Cmd=("nova hypervisor-list" "nova list --fields name,networks,host --all-tenants")
-		declare -a Log=("/var/log/nova" "/var/log/nova/nova-api")
-		;;
-	reclass) ### Reclas Model ###
+	cephosd) 
+		### Ceph OSD ###
+		declare -a Log=("none")
+	;;
+	nova) 	
+		### Nova ###
+		declare -a Cmd=(	"nova hypervisor-list" \ 
+					"nova list --fields name,networks,host --all-tenants" \
+				)
+		declare -a Log=(	"/var/log/nova/nova-conductor.log" \
+		       			"/var/log/nova/nova-api" \
+					"/var/log/nova-scheduler.log" \
+					"/var/log/nova/nova-placement-api.log" \
+					"/var/log/libvirt" \
+				)
+		declare -a Svc=(	"nova-api.service" \
+					"nova-conductor.service" \
+					"nova-scheduler.service" \
+				)
+
+		declare -a Cfg=(	"/etc/nova/nova.conf" \
+				)
+
+	;;
+	reclass) 
+		### Reclas Model ###
 		declare -a Cmd=("tar -zcvf `date '+%Y%m%d%H%M%S'`.tar.gz /var/salt/reclass $targetdir")
-		;;
+	;;
 	*) 
 		usage
-		;;
+	;;
 esac
 
 
@@ -104,6 +181,11 @@ printf '%s\n' "Executing:"
 printf '	%s\n' "${Cmd[@]}"
 printf '%s\n' "Collecting logs:"
 printf '	%s\n' "${Log[@]}"
+printf '%s\n' "Checking these services"
+printf '        %s\n' "${Svc[@]}"
+printf '%s\n' "Collecting these configuration files:"
+printf '        %s\n' "${Cfg[@]}"
+
 echo ""
 
 # a=(foo bar "foo 1" "bar two")  #create an array
