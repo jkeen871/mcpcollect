@@ -26,8 +26,8 @@ function usage(){
 
 while getopts "C:c:h:o:t:i:r:" arg; do
   case $arg in
-	  c) component="$OPTARG";;
-	  h) targethost="$OPTARG";;
+	  c) component+=("$OPTARG");;
+	  h) targethostvalues+=("$OPTARG");;
 	  C) confighost="$OPTARG";;
   esac
 done
@@ -72,6 +72,7 @@ case $component in
 	;;
 	horizon)
 		declare -a Log=(	"/var/log/horizon/*.log" 			\
+					"/var/log/apache2/*.log"
 				)
 		declare -a Svc=(	"apache2.service" 				\
 				)
@@ -92,7 +93,7 @@ case $component in
 				)
 	;;
 	cinder)
-		declare -a Log=(	"/var/log/cinder/cinder.log"			\
+		declare -a Log=(	"/var/log/cinder/*.log"				\
 				)
 		declare -a Cfg=(	"/etc/cinder/*" 				\
 				)
@@ -104,8 +105,6 @@ case $component in
 	;;
 	ceph) 
 		### Ceph General ###
-		cephLogDir="/var/log/ceph"
-		cephOsdDir="/var/log/ceph"
 		declare -a Cmd=(	"ceph -s"					\
 					"ceph health detail" 				\
 				       	"ceph --version" 				\
@@ -120,15 +119,6 @@ case $component in
 					"ceph.target"					\
 				)
 		declare -a Cfg=(	"/etc/ceph/*"					\
-				)
-	;;
-	cephallnodes) 
-		### Run this on all ceph nodes"
-		declare -a Cmd=(	"service ceph status" 				\ 
-				)
-		declare -a Log=(	"none"						\
-				) 
-		declare -a Cfg=(	"/etc/ceph/ceph.conf"				\
 				)
 	;;
 
@@ -180,15 +170,6 @@ function collectdata {
 	fi
 }
 
-function test { 
-	echo ${Cmd[@]}
-
-}
-
-function pullresults {
-	echo "scp from targetdir on target host to $localtargetdir"
-
-}
 
 echo ""
 printf '%s: %s\tcomponent: %s\n' "Target host" "$targethost" "$component"
@@ -203,9 +184,6 @@ printf '%s\n' "Will collect config files:"
 printf '        %s\n' "${Cfg[@]}"
 printf '%s \n' "-----------------------------------------------------"
 echo ""
-
-test
-
 read -p "Do you want to continue? [y/n] " -n 1 -r
 echo    # (optional) move to a new line
 if [[ $REPLY =~ ^[Nn]$ ]]
@@ -213,19 +191,28 @@ then
 	exit
 fi
 
-function collectFiles {
-        collectTarget=$1
-        collectName=$2
-	echo "Collecting $collectName..."
-        ############ Collect files #########
-        # TODO:
-        # *** Clean up remote-target dir
+echo "${targethostvalues[@]}"
+echo ${#targethostvalues[@]}
 
-        sshCmd='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$component'-'$collectName'.tar.gz '$collectTarget'";scp -r '$targethost':'$remotetargetdir'/* '$remotetargetdir'/'
-#       echo $sshCmd
-        ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
+function collectFiles {
+	collectType=$1
+        echo "Collecting $collectType"
+        sshCmd=""
+	tarname="$targethost-$component-files.tar.gz"
+	if [ "$collectType" = "Log" ]; then
+                        sourceFile=${Log[@]}
+	elif [ "$collectType" = "Cfg" ]; then
+                        sourceFile=${Cfg[@]}
+	elif [ "$collectType" = "All" ]; then
+			sourceFile="`echo ${Log[@]}` `echo  ${Cfg[@]}`"
+	fi
+	
+	sshCmd='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethost':'$remotetargetdir'/'$tarname' '$remotetargetdir'/'
+	ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
 	echo "   complete."
 }
+
+
 
 function cleanTargethost {
 	echo "Cleaning target host..."
@@ -235,7 +222,7 @@ function cleanTargethost {
 }
 
 function cleanCfgHost {
-        echo "Cleaning target host..."
+        echo "Cleaning CFG host..."
         sshCmd='rm -fR '$remotetargetdir''
         ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
 	echo "   complete."
@@ -244,7 +231,7 @@ function cleanCfgHost {
 
 function transferResultsCfg {
 	echo "Transferring results to cfg node..."
-	sshCmd='mkdir -p '$remotetargetdir';scp -r '$targethost':'$remotetargetdir'/* '$remotetargetdir
+	sshCmd='mkdir -p '$remotetargetdir';scp -o StrictHostKeyChecking=no -r '$targethost':'$remotetargetdir'/* '$remotetargetdir
         ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
 	echo "   complete."
 }
@@ -252,7 +239,7 @@ function transferResultsCfg {
 function transferResultsLocal {
         echo "Transferring to localhost..."
 	mkdir -p $localtargetdir
-	tarname="$component-`date '+%Y%m%d%H%M%S'`.tar.gz"
+	tarname="$targethost-$component-`date '+%Y%m%d%H%M%S'`.tar.gz"
 	ssh -q -o StrictHostKeyChecking=no $confighost "cd $remotetargetdir;tar -czf $tarname *"
 	scp -q -o StrictHostKeyChecking=no -r $confighost:$remotetargetdir/$tarname $localtargetdir/
 	echo "   complete."
@@ -260,8 +247,6 @@ function transferResultsLocal {
 
 
 function executeCommands {
-
-	############## Execute Commands ################
 	echo "Executing commands"
 	lenCmd=${#Cmd[@]}
 	countCmd=1
@@ -273,12 +258,11 @@ function executeCommands {
 		fi
 		((countCmd++))
 	done
-	sshCmd='mkdir -p '$remotetargetdir'; sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" > '$remotetargetdir'/'$component'-cmd'
+	sshCmd='mkdir -p '$remotetargetdir'; sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" > '$remotetargetdir'/'$targethost'-'$component'-cmd'
 	ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
 }
 
 function getServices {
-	#### Check Services ####
 	echo "Collecting Services"
 	sshCmd=""
 	lenSvc=${#Svc[@]}
@@ -290,22 +274,34 @@ function getServices {
 		if [ $countSvc -lt $lenSvc ]; then
 			sshCmd+=";"
 		fi
-	#        echo $sshCmd
 		((countSvc++))
 
 	done
-	sshCmd='sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" > '$remotetargetdir'/'$component'-svc'
+	sshCmd='sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" > '$remotetargetdir'/'$targethost'-'$component'-svc'
 	ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
 }
 
 
+function fullRun {
+	echo "Collectin results for target host $targethost"
+	echo "==========================================================="
+	executeCommands
+	getServices
+	collectFiles "All"
+	#collectFiles "Log"
+	#collectFiles "Cfg"
+	transferResultsCfg
+	transferResultsLocal
+	cleanTargethost
+	cleanCfgHost
+	echo "Collection complete for $targethost"
+	echo "-----"
+	echo ""
+}
 
-#### Collect data ####
-executeCommands
-getServices
-collectFiles $Log "Logs"
-collectFiles $Cfg "Confs"
-transferResultsCfg
-transferResultsLocal
-cleanTargethost
-cleanCfgHost
+
+for x in ${targethostvalues[@]}; 
+do 
+	targethost=$x
+	fullRun
+done
