@@ -1,9 +1,9 @@
 #!/bin/bash
+
 keystonercfile="/root/keystonercv3"
 remotetargetdir="/tmp/mcpcollect"
-localtargetdir="/tmp/mcpcollect"
 
-sshCmd=". $keystonercfile;"
+#sshCmd=". $keystonercfile;"
 
 
 function usage(){
@@ -48,11 +48,14 @@ done
 
 ## MCP Collector ##
 
-targetdir="/tmp/mcpcollect"
-localtargetdir="/tmp/mcpcollect"
+localtargetdir="/tmp/mcpcollect/$confighost"
+if [ "$component" == *"ctl"* ]; then
+	sshCmd=". $keystonercfile;"
+fi
 
-if [[ ! -e "$targetdir" ]]; then
-	mkdir -p $targetdir
+
+if [[ ! -e "$localtargetdir" ]]; then
+	mkdir -p $localtargetdir
 	### Check for error creating directory
 fi
 
@@ -74,7 +77,7 @@ case $component in
 				)
 		declare -a Cmd=(	"netstat -nltp | egrep ':80|:443'" 		\
 				)
-		declare -a Cfg=(	"/etc/apache/*" 				\
+		declare -a Cfg=(	"/etc/apache2/*" 				\
 				)
 	;;	
 	neutron)
@@ -110,7 +113,13 @@ case $component in
 					"ceph pg dump" 					\
 					"ceph osd tree" 				\
 				)
-		declare -a Log=(	"ceph.log"					\	
+		declare -a Log=(	"/var/log/ceph/*.log"				\	
+				)
+		declare -a Svc=(	"ceph-mon.target"					\
+					"ceph-mgr.target"					\
+					"ceph.target"					\
+				)
+		declare -a Cfg=(	"/etc/ceph/*"					\
 				)
 	;;
 	cephallnodes) 
@@ -179,45 +188,72 @@ function pullresults {
 }
 
 echo ""
-printf '%s:     %s\n' "Target host" "$targethost"
-printf '%s:     %s\n' "Component" "$component"
-printf '%s\n' "Executing:"
+printf '%s: %s\tcomponent: %s\n' "Target host" "$targethost" "$component"
+printf '%s \n' "====================================================="
+printf '%s\n' "Will execute commands:"
 printf '	%s\n' "${Cmd[@]}"
-printf '%s\n' "Collecting logs:"
+printf '%s\n' "Will collect logs:"
 printf '	%s\n' "${Log[@]}"
-printf '%s\n' "Checking these services"
+printf '%s\n' "Will check status of services:"
 printf '        %s\n' "${Svc[@]}"
-printf '%s\n' "Collecting these configuration files:"
+printf '%s\n' "Will collect config files:"
 printf '        %s\n' "${Cfg[@]}"
-
+printf '%s \n' "-----------------------------------------------------"
 echo ""
 
 
-function collect {
+read -p "Do you want to continue? [y/n] " -n 1 -r
+echo    # (optional) move to a new line
+if [[ $REPLY =~ ^[Nn]$ ]]
+then
+	exit
+fi
+
+function collectFiles {
         collectTarget=$1
         collectName=$2
-
+	echo "Collecting $collectName..."
         ############ Collect files #########
         # TODO:
         # *** Clean up remote-target dir
 
-        sshCmd='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar cvzf '$remotetargetdir'/'$component'-'$collectName'.tar.gz '$collectTarget'";scp -r '$targethost':'$remotetargetdir'/* '$remotetargetdir'/'
+        sshCmd='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$component'-'$collectName'.tar.gz '$collectTarget'";scp -r '$targethost':'$remotetargetdir'/* '$remotetargetdir'/'
 #       echo $sshCmd
-        ssh $confighost $sshCmd
+        ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
+	echo "   complete."
 }
 
-function cleantargethost {
-        sshCmd='sudo salt "*'$targethost'*" cmd.run "rm -fR '$remotetargetdir'"'
-        ssh $confighost $sshCmd
-#       echo $sshCmd
-
+function cleanTargethost {
+	echo "Cleaning target host..."
+	sshCmd='sudo salt "*'$targethost'*" cmd.run "rm -fR '$remotetargetdir'"'
+        ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
+	echo "   complete."
 }
 
-function transferResults {
-        sshCmd='mkdir -p '$remotetargetdir';scp -r '$targethost':'$remotetargetdir'/* '$remotetargetdir
-        ssh $confighost $sshCmd
-#       echo $sshCmd
+function cleanCfgHost {
+        echo "Cleaning target host..."
+        sshCmd='rm -fR '$remotetargetdir''
+        ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
+	echo "   complete."
 }
+
+
+function transferResultsCfg {
+	echo "Transferring results to cfg node..."
+	sshCmd='mkdir -p '$remotetargetdir';scp -r '$targethost':'$remotetargetdir'/* '$remotetargetdir
+        ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
+	echo "   complete."
+}
+
+function transferResultsLocal {
+        echo "Transferring to localhost..."
+	mkdir -p $localtargetdir
+	tarname="$component-`date '+%Y%m%d%H%M%S'`.tar.gz"
+	ssh -q -o StrictHostKeyChecking=no $confighost "cd $remotetargetdir;tar -czf $tarname *"
+	scp -q -o StrictHostKeyChecking=no -r $confighost:$remotetargetdir/$tarname $localtargetdir/
+	echo "   complete."
+}
+
 
 
 
@@ -228,25 +264,23 @@ function transferResults {
 
 
 ############## Execute Commands ################
-
+echo "Executing commands"
 lenCmd=${#Cmd[@]}
 countCmd=1
 for (( i=0; i<${lenCmd}; i++ ));
 do
-
 	sshCmd+="echo '=';echo '==== ${Cmd[$i]}====';echo '=';${Cmd[$i]}"
 	if [ $countCmd -lt $lenCmd ]; then
 		sshCmd+=";"
 	fi
-#	echo $sshCmd
 	((countCmd++))
-
 done
-sshCmd='mkdir -p '$remotetargetdir';date > '$remotetargetdir'/'$component'; sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" >> '$remotetargetdir'/'$component'-cmd'
-ssh $confighost $sshCmd
+sshCmd='mkdir -p '$remotetargetdir'; sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" > '$remotetargetdir'/'$component'-cmd'
+ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
 
 
 #### Check Services ####
+echo "Collecting Services"
 sshCmd=""
 lenSvc=${#Svc[@]}
 countSvc=1
@@ -261,17 +295,17 @@ do
         ((countSvc++))
 
 done
-sshCmd='sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" >> '$remotetargetdir'/'$component'-svc'
-echo $sshCmd
-#>i> '$remotetargetdir'/'$component
-ssh $confighost $sshCmd
+sshCmd='sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" > '$remotetargetdir'/'$component'-svc'
+ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
 
 
 
 
 #### Collect data ####
 
-collect $Log "Logs"
-collect $Cfg "Confs"
-transferResults
-cleantargethost
+collectFiles $Log "Logs"
+collectFiles $Cfg "Confs"
+transferResultsCfg
+transferResultsLocal
+cleanTargethost
+cleanCfgHost
