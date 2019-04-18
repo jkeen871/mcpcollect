@@ -180,7 +180,10 @@ function collectdata {
 	fi
 }
 
+function test { 
+	echo ${Cmd[@]}
 
+}
 
 function pullresults {
 	echo "scp from targetdir on target host to $localtargetdir"
@@ -201,6 +204,7 @@ printf '        %s\n' "${Cfg[@]}"
 printf '%s \n' "-----------------------------------------------------"
 echo ""
 
+test
 
 read -p "Do you want to continue? [y/n] " -n 1 -r
 echo    # (optional) move to a new line
@@ -255,54 +259,50 @@ function transferResultsLocal {
 }
 
 
+function executeCommands {
 
+	############## Execute Commands ################
+	echo "Executing commands"
+	lenCmd=${#Cmd[@]}
+	countCmd=1
+	for (( i=0; i<${lenCmd}; i++ ));
+	do
+		sshCmd+="echo '=';echo '==== ${Cmd[$i]}====';echo '=';${Cmd[$i]}"
+		if [ $countCmd -lt $lenCmd ]; then
+			sshCmd+=";"
+		fi
+		((countCmd++))
+	done
+	sshCmd='mkdir -p '$remotetargetdir'; sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" > '$remotetargetdir'/'$component'-cmd'
+	ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
+}
 
+function getServices {
+	#### Check Services ####
+	echo "Collecting Services"
+	sshCmd=""
+	lenSvc=${#Svc[@]}
+	countSvc=1
+	for (( i=0; i<${lenSvc}; i++ ));
+	do
 
+		sshCmd+="echo '=';echo '==== ${Svc[$i]}====';echo '=';systemctl status ${Svc[$i]}"
+		if [ $countSvc -lt $lenSvc ]; then
+			sshCmd+=";"
+		fi
+	#        echo $sshCmd
+		((countSvc++))
 
-
-
-
-
-############## Execute Commands ################
-echo "Executing commands"
-lenCmd=${#Cmd[@]}
-countCmd=1
-for (( i=0; i<${lenCmd}; i++ ));
-do
-	sshCmd+="echo '=';echo '==== ${Cmd[$i]}====';echo '=';${Cmd[$i]}"
-	if [ $countCmd -lt $lenCmd ]; then
-		sshCmd+=";"
-	fi
-	((countCmd++))
-done
-sshCmd='mkdir -p '$remotetargetdir'; sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" > '$remotetargetdir'/'$component'-cmd'
-ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
-
-
-#### Check Services ####
-echo "Collecting Services"
-sshCmd=""
-lenSvc=${#Svc[@]}
-countSvc=1
-for (( i=0; i<${lenSvc}; i++ ));
-do
-
-        sshCmd+="echo '=';echo '==== ${Svc[$i]}====';echo '=';systemctl status ${Svc[$i]}"
-        if [ $countSvc -lt $lenSvc ]; then
-                sshCmd+=";"
-        fi
-#        echo $sshCmd
-        ((countSvc++))
-
-done
-sshCmd='sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" > '$remotetargetdir'/'$component'-svc'
-ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
-
+	done
+	sshCmd='sudo salt "*'$targethost'*" cmd.run "'$sshCmd'" > '$remotetargetdir'/'$component'-svc'
+	ssh -q -oStrictHostKeyChecking=no $confighost $sshCmd
+}
 
 
 
 #### Collect data ####
-
+executeCommands
+getServices
 collectFiles $Log "Logs"
 collectFiles $Cfg "Confs"
 transferResultsCfg
