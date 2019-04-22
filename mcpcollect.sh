@@ -288,10 +288,11 @@ s                                )
 	nova.compute)		               
 		declare -g Cmd=(        "virsh list"                          \
                                 	"ps -ef | grep libvirt" \
-					"for x in \`virsh list | egrep -v 'Id|--' | awk '{print $2}'\`; do echo '==='$x'===';virsh dumpxml $x; echo '' ;done" \
+					"ps -ef | grep 'nova'"\
+#					"for x in `virsh list | egrep -v 'Id|--' | awk '{print $2}'`; do echo '==='$x'===';virsh dumpxml $x; echo '' ;done" \
 				)
                 declare -g Log=(        "/var/log/nova/"                           \
-                                        "/var/log/libvirt"                             \
+                                        "/var/log/libvirt/"                             \
                                 )
                 declare -g Svc=(        "service nova-compute status"                             \
                                 )
