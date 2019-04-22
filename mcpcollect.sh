@@ -91,7 +91,7 @@
 #xtrabackup.server
 
 
-while getopts "c:h:g::s:ayp" arg; do
+while getopts "c:h:g::s:layp" arg; do
         case $arg in
                 c) componentFlag=true; componentvalues+=("$OPTARG");;
                 h) targetHostFlag=true;targethostvalues+=("$OPTARG");;
@@ -101,15 +101,18 @@ while getopts "c:h:g::s:ayp" arg; do
                 y) skipconfirmationFlag=true;;
                 p) previewFlag=true;;
 		q) queryflag=true;;
+		l) runlocalFlag=true;;
 		*) usage;;
                 \?) usage;;
         esac
 done
-localtargetdir="/tmp/mcpcollect/$confighost"
+datestamp=`date '+%Y%m%d%H%M%S'`
+localbasedir="/tmp/mcpcollect"
+localtargetdir="$localbasedir/$confighost/$datestamp"
 keystonercv3="/root/keystonercv3"
 keystonercv2="/root/keystonerc"
-remotetargetdir="/tmp/mcpcollect"
-datestamp=`date '+%Y%m%d%H%M%S'`
+remotebasedir="/tmp/mcpcollect"
+remotetargetdir="$remotebasedir/$datestamp"
 green='\e[1;92m'
 nocolor='\033[0m'
 red='\e[1;31m'
@@ -147,6 +150,8 @@ function usage {
         echo "    -y -- Autoconfirm -- Do not print confirmation and summary prompt"
         echo ""
 	echo "    -p -- Preview only --Do not collect any files, previews what will be collected for each grain"
+	echo ""
+	echo "    -l -- Run on your localhost with ssh access to a Cfg or Salt node.  This option also requires the -s switch"
         exit
 
 }
@@ -262,7 +267,7 @@ case $component in
                                         "ceph df"                                       \
                                         "ceph pg dump"                                  \
                                         "ceph osd tree"                                 \
-                                        "ceph osd getcrushmap -o /tmp/mcpcollect/compiledmap; crushtool -d /tmp/mcpcollect/compiledmap; rm /tmp/mcpcollect/compiledmap" \
+                                        "ceph osd getcrushmap -o /tmp/compiledmap; crushtool -d /tmp/compiledmap; rm /tmp/compiledmap" \
                                 )
                 declare -g Log=(        "/var/log/ceph/"                        \
                                 )
@@ -359,38 +364,52 @@ function collectFiles {
 		sourceFile="`echo ${Cfg[@]} ${Log[@]}`"
 	fi
 	sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethost':'$remotetargetdir'/'$tarname' '$remotetargetdir'/'
-	ssh -q -oStrictHostKeyChecking=no $confighost $sshCollectFiles
+	if [ $runlocalFlag ]; then
+		ssh -q -oStrictHostKeyChecking=no $confighost $sshCollectFiles
+	else
+		eval $sshCollectFiles
+	fi
 	echo "   complete."
 }
 
 function cleanTargethost {
 	echo "Cleaning temproary files from $targethost,$component..."
-	sshCleanTarget='sudo salt "*'$targethost'*" cmd.run "rm -fR '$remotetargetdir'"'
-        ssh -q -oStrictHostKeyChecking=no $confighost $sshCleanTarget
+	sshCleanTarget='sudo salt "*'$targethost'*" cmd.run "rm -fR '$remotebasedir'"'
+	if [ $runlocalFlag ]; then
+		ssh -q -oStrictHostKeyChecking=no $confighost $sshCleanTarget
+	else
+                eval $sshCleanTarget
+        fi
 	echo "   complete."
 }
 
 function cleanCfgHost {
         echo "Cleaning temporary files from $confighost,$component..."
-        sshCleanCfg='rm -fR '$remotetargetdir''
-        ssh -q -oStrictHostKeyChecking=no $confighost $sshCleanCfg
+        sshCleanCfg='rm -fR '$remotebasedir''
+        	ssh -q -oStrictHostKeyChecking=no $confighost $sshCleanCfg
 	echo "   complete."
 }
 
 function transferResultsCfg {
 	echo "Transferring results from $targethost to $confighost,$component..."
-	sshXferResultsCfg='mkdir -p '$remotetargetdir';scp -o StrictHostKeyChecking=no -r '$targethost':'$remotetargetdir'/* '$remotetargetdir
-        ssh -q -oStrictHostKeyChecking=no $confighost $sshXferResultsCfg
+	localdestdir="$remotetargetdir/$targethost"
+	sshXferResultsCfg='mkdir -p '$localdestdir';scp -o StrictHostKeyChecking=no -r '$targethost':'$remotetargetdir'/* '$localdestdir
+	if [ $runlocalFlag ]; then
+		ssh -q -oStrictHostKeyChecking=no $confighost $sshXferResultsCfg
+	else
+		eval $sshXferResultsCfg
+	fi
 	echo "   complete."
 }
 
 function transferResultsLocal {
 	#compress tmpdir and copy to localhost
         echo "Transferring $component results from $confighost to localhost..."
-	mkdir -p $localtargetdir
+	localdestdir="$localtargetdir/$targethost"
+	mkdir -p $localdestdir
 	tarname="$targethost-$component-$datestamp.tar.gz"
-	ssh -q -o StrictHostKeyChecking=no $confighost "cd $remotetargetdir;tar -czf $tarname *"
-	scp -q -o StrictHostKeyChecking=no -r $confighost:$remotetargetdir/$tarname $localtargetdir/
+	ssh -q -o StrictHostKeyChecking=no $confighost "cd $remotetargetdir/$targethost;tar -czf $tarname *"
+	scp -q -o StrictHostKeyChecking=no -r $confighost:$remotetargetdir/$targethost/$tarname $localdestdir/
 	echo "   complete."
 }
 
@@ -426,8 +445,14 @@ function executeRemoteCommands {
                 fi
                 ((countCmd++))
         done
-        sshExecuteRemoteCommands='mkdir -p '$remotetargetdir'; sudo salt "*'$targethost'*" cmd.run "'$sshExecuteRemoteCommands'" > '$remotetargetdir'/'$targethost'-'$component'-'$commandType'-'$datestamp''
-        ssh -q -oStrictHostKeyChecking=no $confighost $sshExecuteRemoteCommands
+	localdestdir="$remotetargetdir/$targethost"
+	sshExecuteRemoteCommands='mkdir -p '$localdestdir'/output; sudo salt "*'$targethost'*" cmd.run "'$sshExecuteRemoteCommands'" > '$localdestdir'/output/'$targethost'-'$component'-'$commandType''
+#        sshExecuteRemoteCommands='mkdir -p '$localdestdir'/output-'$datestamp'; sudo salt "*'$targethost'*" cmd.run "'$sshExecuteRemoteCommands'" > '$localdestdir'/output-'$datestamp'/'$targethost'-'$component'-'$commandType'-'$datestamp''
+	if [ $runlocalFlag ]; then
+		ssh -q -oStrictHostKeyChecking=no $confighost $sshExecuteRemoteCommands
+	else
+		eval $sshExecuteRemoteCommands
+	fi
 }
 
 function scrubArrays {
@@ -466,9 +491,12 @@ function scrubArrays {
 function getTargetHostByGrains() {
 	grain=$1
 	sshGetHostByGrains="sudo salt --out txt  '*' grains.item roles  | grep '$grain' | awk -F':' '{printf \$1 \" \" }'"
-	result=`ssh -q mmo-mediakind-stg-cfg01 $sshGetHostByGrains`
+	if [ $runlocalFlag ]; then
+		result=`ssh -q mmo-mediakind-stg-cfg01 $sshGetHostByGrains`
+	else
+		eval $sshGetHostByGrains
+	fi
 	echo $result
-
 }
 
 containsElement () {
@@ -482,6 +510,7 @@ function hostsAssociatedWithSaltGrain {
 	grain=$1
 	echo "Collecting hosts associated with $grain.."
 	grainhostvalues=($(getTargetHostByGrains "$grain"))
+	
 	if [ $targetHostFlag ]; then
 		targethostloopvalues=()
 		for x in ${targethostvalues[@]}
@@ -496,7 +525,6 @@ function hostsAssociatedWithSaltGrain {
 	else
 		targethostloopvalues=(${grainhostvalues[@]})
 	fi
-
 	}
 
 
@@ -509,9 +537,12 @@ function collect {
                         executeRemoteCommands "svc"
                         collectFiles "all"
                         transferResultsCfg
-                        transferResultsLocal
-                        cleanTargethost
-                        cleanCfgHost
+			cleanTargethost
+			if [ $runlocalFlag ]; then
+	                        transferResultsLocal
+        	                cleanCfgHost	
+			fi
+
                         echo "Collection complete for $targethost"
                         echo "-----"
                         echo ""
@@ -525,12 +556,13 @@ function main {
 
 	if [ "$confighost" != "" ]; then
 		if [ ! -d "$localtargetdir" ]; then
+			echo $localtargetdir
 			mkdir -p $localtargetdir
 			### Check for error creating directory
 		fi
 	fi
 
-	if [  ! $confighostFlag ]; then
+	if [ ! $confighostFlag ] && [ $runlocalFlag ];  then
 		echo " USAGE ERROR  -s is a required switch"
 		usage
 	fi
@@ -562,7 +594,7 @@ function main {
 			componentvalues=(${saltgrain[@]})
 
 		fi
-		if [ $previewFlag ]; then
+		if [ $previewFlag ] || [ $skipconfirmationFlag ] ; then
 			noconfirm=true
 		fi
 		assignArrays "$component"	
@@ -602,7 +634,7 @@ function componentSummary () {
 	echo ""
 	printf '%s' "Summary for hosts : "
 	printf '%s, ' "${targethostloopvalues[@]}"| cut -d "," -f 1-${#targethostloopvalues[@]}
-	printf 'Component : %s\n' "$component"  
+	printf 'Component : %s\nDatestamp : %s\n' "$component" "$datestamp" 
 	printf '%s \n' "====================================================="
 	printf '%s ' "Commands  :"
 	printf '%s, ' "${Cmd[@]}" | cut -d "," -f 1-${#Cmd[@]}
