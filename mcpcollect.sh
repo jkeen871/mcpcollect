@@ -121,6 +121,12 @@ function usage {
         echo ""
         echo "    mcpcollector -c <nova|neutron|stacklight|ceph>"
         echo ""
+	echo "    -a -- All logs -- Collect all logs from the specified log directory."
+        echo "          The default is to only collect *.log files, setting this switch will collect"
+        echo "          all files in the log directory. "
+        echo "          This option will not work against component general, because that will collect all logs in"
+        echo "          /var/log and could potentially consume too much disk on certain nodes"
+        echo ""
         echo "    -c -- <component>"
         echo "          ceph-mon -- Retrieves ceph data from controller nodes"
         echo "          horizon -- Retrieves horizon data from controller nodes"
@@ -130,9 +136,6 @@ function usage {
         echo "          neutron-controller -- Retrieves neutron data from controller nodes"
         echo "          reclass -- Retrieves reclass model from cfg/salt node"
         echo ""
-        echo "    -s -- <cfg node or salt node>"
-        echo "          REQUIRED : hostname or IP of the salt of config host."
-        echo ""
         echo "    -g -- <salt grain>"
         echo "          Specify the salt grain name (ceph.mon, ceph.common) to collect information from"
         echo "          Hosts from grain are superceeded by host provided in -h"
@@ -141,17 +144,15 @@ function usage {
         echo "          The MCP host name of the systems you want to collect information from"
         echo "          * Multiple host selections are supported (-h host1 -h host2)"
         echo ""
-        echo "    -a -- All logs -- Collect all logs from the specified log directory."
-        echo "          The default is to only collect *.log files, setting this switch will collect"
-        echo "          all files in the log directory. "
-        echo "          This option will not work against component general, because that will collect all logs in"
-        echo "          /var/log and could potentially consume too much disk on certain nodes"
-        echo ""
-        echo "    -y -- Autoconfirm -- Do not print confirmation and summary prompt"
+	echo "    -l -- Run on your localhost with ssh access to a Cfg or Salt node.  This option also requires the -s switch"
         echo ""
 	echo "    -p -- Preview only --Do not collect any files, previews what will be collected for each grain"
 	echo ""
-	echo "    -l -- Run on your localhost with ssh access to a Cfg or Salt node.  This option also requires the -s switch"
+        echo "    -s -- <cfg node or salt node>"
+        echo "          REQUIRED : hostname or IP of the salt of config host."
+        echo ""
+        echo "    -y -- Autoconfirm -- Do not print confirmation and summary prompt"
+
         exit
 
 }
@@ -163,7 +164,7 @@ component=$1
 case $component in
         general)
                 declare -g Log=(        "/var/log/syslog"                 \
-                                )
+s                                )
                 declare -g Cfg=(        "/etc/hosts"                   \
                                 )
                 declare -g Svc=(        "systemctl status ntpd.service"                              \
