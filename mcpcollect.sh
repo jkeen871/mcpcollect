@@ -427,6 +427,19 @@ function transferResultsCfg {
 	echo "   complete."
 }
 
+function collectReclass {
+	echo "Collecting the reclass model..."
+	localdestdir="$remotetargetdir/$targethost"
+	tarname="reclass-$confighost.tar.gz"
+	sshCollectReclass="mkdir -p $localdestdir;sudo /bin/tar -czf $localdestdir/$tarname /srv/salt/reclass/; sudo /bin/chown $USER.$USER $localdestdir/$tarname"
+	if [ $runlocalFlag ]; then
+		ssh -q -o StrictHostKeyChecking=no $confighost $sshCollectReclass
+	else
+		eval $sshCollectReclass
+	fi
+	echo "   complete."
+}
+
 function transferResultsLocal {
 	#compress tmpdir and copy to localhost
         echo "Transferring $component results from $confighost to localhost..."
@@ -563,6 +576,7 @@ function collect {
                         collectFiles "all"
                         transferResultsCfg
 			cleanTargethost
+			collectReclass
 			if [ $runlocalFlag ]; then
 	                        transferResultsLocal
         	                cleanCfgHost	
@@ -581,7 +595,6 @@ function main {
 
 	if [ "$confighost" != "" ]; then
 		if [ ! -d "$localtargetdir" ]; then
-			echo $localtargetdir
 			mkdir -p $localtargetdir
 			### Check for error creating directory
 		fi
