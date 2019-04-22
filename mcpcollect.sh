@@ -90,10 +90,52 @@
 #xtrabackup.client
 #xtrabackup.server
 
+function usage {
+        echo ""
+        echo "    mcpcollector -s <mmo-somehost> -g ceph.osd -h osd001 -h osd002 -y -l"
+        echo ""
+        echo "    -a -- All logs -- Collect all logs from the specified log directory."
+        echo "          The default is to only collect *.log files, setting this switch will collect"
+        echo "          all files in the log directory. "
+        echo "          This option will not work against component general, because that will collect all logs in"
+        echo "          /var/log and could potentially consume too much disk on certain nodes"
+        echo ""
+#        echo "    -c -- <component>"
+#        echo "          ceph-mon -- Retrieves ceph data from controller nodes"
+#        echo "          horizon -- Retrieves horizon data from controller nodes"
+#        echo "          keystone -- Retrieves keystone data from controller nodes"
+#        echo "          cinder-controller -- Retrieves cinder data from contoller nodes"
+#        echo "          nova-controller -- Retrieves nova data from controller nodes"
+#        echo "          neutron-controller -- Retrieves neutron data from controller nodes"
+#        echo "          reclass -- Retrieves reclass model from cfg/salt node"
+#        echo ""
+        echo "    -g -- <salt grain>"
+        echo "          Specify the salt grain name (ceph.mon, ceph.common) to collect information from"
+        echo "          Hosts from grain are superceeded by host provided in -h"
+        echo ""
+        echo "    -h -- <target hostname or IP>"
+        echo "          The MCP host name of the systems you want to collect information from"
+        echo "          * Multiple host selections are supported (-h host1 -h host2)"
+        echo ""
+        echo "    -l -- Run on your localhost with ssh access to a Cfg or Salt node.  This option also requires the -s switch"
+        echo ""
+        echo "    -p -- Preview only --Do not collect any files, previews what will be collected for each grain"
+        echo ""
+        echo "    -s -- <cfg node or salt node>"
+        echo "          REQUIRED : hostname or IP of the salt of config host."
+        echo ""
+        echo "    -y -- Autoconfirm -- Do not print confirmation and summary prompt"
+
+        exit
+
+}
+
+
+#                c) componentFlag=true; componentvalues+=("$OPTARG");;
+
 
 while getopts "c:h:g::s:layp" arg; do
         case $arg in
-                c) componentFlag=true; componentvalues+=("$OPTARG");;
                 h) targetHostFlag=true;targethostvalues+=("$OPTARG");;
                 s) confighostFlag=true;confighost="$OPTARG";;
                 a) alllogsFlag=true;;
@@ -106,6 +148,10 @@ while getopts "c:h:g::s:layp" arg; do
                 \?) usage;;
         esac
 done
+
+if [ $OPTIND -eq 1 ]; then usage ; fi
+
+
 datestamp=`date '+%Y%m%d%H%M%S'`
 localbasedir="/tmp/mcpcollect"
 localtargetdir="$localbasedir/$confighost/$datestamp"
@@ -116,47 +162,6 @@ remotetargetdir="$remotebasedir/$datestamp"
 green='\e[1;92m'
 nocolor='\033[0m'
 red='\e[1;31m'
-
-function usage {
-        echo ""
-        echo "    mcpcollector -c <nova|neutron|stacklight|ceph>"
-        echo ""
-	echo "    -a -- All logs -- Collect all logs from the specified log directory."
-        echo "          The default is to only collect *.log files, setting this switch will collect"
-        echo "          all files in the log directory. "
-        echo "          This option will not work against component general, because that will collect all logs in"
-        echo "          /var/log and could potentially consume too much disk on certain nodes"
-        echo ""
-        echo "    -c -- <component>"
-        echo "          ceph-mon -- Retrieves ceph data from controller nodes"
-        echo "          horizon -- Retrieves horizon data from controller nodes"
-        echo "          keystone -- Retrieves keystone data from controller nodes"
-        echo "          cinder-controller -- Retrieves cinder data from contoller nodes"
-        echo "          nova-controller -- Retrieves nova data from controller nodes"
-        echo "          neutron-controller -- Retrieves neutron data from controller nodes"
-        echo "          reclass -- Retrieves reclass model from cfg/salt node"
-        echo ""
-        echo "    -g -- <salt grain>"
-        echo "          Specify the salt grain name (ceph.mon, ceph.common) to collect information from"
-        echo "          Hosts from grain are superceeded by host provided in -h"
-        echo ""
-        echo "    -h -- <target hostname or IP>"
-        echo "          The MCP host name of the systems you want to collect information from"
-        echo "          * Multiple host selections are supported (-h host1 -h host2)"
-        echo ""
-	echo "    -l -- Run on your localhost with ssh access to a Cfg or Salt node.  This option also requires the -s switch"
-        echo ""
-	echo "    -p -- Preview only --Do not collect any files, previews what will be collected for each grain"
-	echo ""
-        echo "    -s -- <cfg node or salt node>"
-        echo "          REQUIRED : hostname or IP of the salt of config host."
-        echo ""
-        echo "    -y -- Autoconfirm -- Do not print confirmation and summary prompt"
-
-        exit
-
-}
-
 
 function assignArrays {
 component=$1
