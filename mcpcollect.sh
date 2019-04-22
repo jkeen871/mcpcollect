@@ -285,13 +285,31 @@ s                                )
                                 )
         ;;
 
-        nova.controller)
+	nova.compute)		               
+		declare -g Cmd=(        "virsh list"                          \
+                                	"ps -ef | grep libvirt" \
+					"for x in \`virsh list | egrep -v 'Id|--' | awk '{print $2}'\`; do echo '==='$x'===';virsh dumpxml $x; echo '' ;done" \
+				)
+                declare -g Log=(        "/var/log/nova/"                           \
+                                        "/var/log/libvirt"                             \
+                                )
+                declare -g Svc=(        "service nova-compute status"                             \
+                                )
+
+                declare -g Cfg=(        "/etc/nova/"                           \
+					"/etc/libvirt/"
+                                )
+
+
+
+	;;
+	nova.controller)
                 ### Nova ###
                 declare -g Cmd=(        "nova hypervisor-list"                          \
                                         "nova list --fields name,networks,host --all-tenants" \
                                 )
                 declare -g Log=(        "/var/log/nova/"                           \
-                                        "/var/log/libvirt/"                                \
+                                        		                               \
                                 )
                 declare -g Svc=(        "systemctl status nova-api.service"                             \
                                         "systemctl status nova-conductor.service"                       \
@@ -498,7 +516,7 @@ function getTargetHostByGrains() {
 	grain=$1
 	sshGetHostByGrains="sudo salt --out txt  '*' grains.item roles  | grep '$grain' | awk -F':' '{printf \$1 \" \" }'"
 	if [ $runlocalFlag ]; then
-		result=`ssh -q mmo-mediakind-stg-cfg01 $sshGetHostByGrains`
+		result=`ssh -q $confighost $sshGetHostByGrains`
 	else
 		eval $sshGetHostByGrains
 	fi
