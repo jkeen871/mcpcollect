@@ -290,6 +290,7 @@ case $component in
 				)
                 declare -g Log=(        "/var/log/nova/"                           \
 					"/var/log/libvirt/qemu/"			\
+					"/var/log/syslog"	\
                                 )
                 declare -g Svc=(        "service nova-compute status"                             \
                                 )
@@ -361,14 +362,14 @@ function warning {
 }
 
 function abort {
-	echo -e "${red} \n"
+	echo -e "${red}"
 	echo "Exiting with error(s):" 
 	lenabortmessage=${#abortmessage[@]}
 	for (( i=0; i<${lenabortmessage}; i++ ));
 	do
 		printf '        %s\n' "${abortmessage[$i]}"
 	done
-	echo -e "${nocolor} \n"
+	echo -e "${nocolor}"
 	abortmessage=()
 	exit
 }
@@ -429,9 +430,7 @@ function getIpAddrFromSalt {
 	host=$1
 	echo "Getting IP address for $host from reclass..."
 	sshgetipaddress="for x in \$(sudo salt '"*$host*"' network.ip_addrs|grep '-' | awk -F'-' '{print \$2}' | sed 's/ //g');do ping -c1 \$x 2>&1 >/dev/null; if [ \$? = 0 ];  then echo \$x ;break;fi; done"
-	echo $sshgetipaddress
 	targethostip=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
-#echo ${targethostip[@]}
 	echo "   complete"
 }
 
@@ -493,7 +492,6 @@ function executeRemoteCommands {
         done
 	localdestdir="$remotetargetdir/$targethost"
 	sshExecuteRemoteCommands='mkdir -p '$localdestdir'/output; sudo salt "*'$targethost'*" cmd.run "'$sshExecuteRemoteCommands'" > '$localdestdir'/output/'$targethost'-'$component'-'$commandType''
-	echo $sshExecuteRemoteCommands
 	if [ $runlocalFlag ]; then
 		ssh -q -oStrictHostKeyChecking=no $confighost $sshExecuteRemoteCommands
 	else
@@ -538,7 +536,7 @@ function getTargetHostByGrains() {
 	grain=$1
 	sshGetHostByGrains="sudo salt --out txt  '*' grains.item roles  | grep '$grain' | awk -F':' '{printf \$1 \" \" }'"
 	if [ $runlocalFlag ]; then
-		result=`ssh -q $confighost $sshGetHostByGrains`
+		result=$(ssh -q $confighost $sshGetHostByGrains)
 	else
 		eval $sshGetHostByGrains
 	fi
@@ -556,6 +554,10 @@ function hostsAssociatedWithSaltGrain {
 	grain=$1
 	echo "Collecting hosts associated with $grain.."
 	grainhostvalues=($(getTargetHostByGrains "$grain"))
+	if [ ${#grainhostvalues[@]} = 0 ]; then 
+		abortmessage+=("$target host not found in garin $grain")
+
+	fi
 	
 	if [ $targetHostFlag ]; then
 		targethostloopvalues=()
@@ -569,8 +571,14 @@ function hostsAssociatedWithSaltGrain {
 			fi
 		done
 	else
+
 		targethostloopvalues=(${grainhostvalues[@]})
 	fi
+        if [ ${#targethostloopvalues[@]} = 0 ]; then
+		abortmessage+=("No provided host not found in grain $grain")
+        fi
+
+
 	}
 
 
@@ -579,7 +587,6 @@ function collect {
 			component=$2
 
 			getIpAddrFromSalt $targethost 
-	#		echo ${targethostip[@]}
 			echo "Collecting results for target host $targethost, $component"
                         echo "==========================================================="
                         executeRemoteCommands "cmd"
@@ -646,14 +653,18 @@ function main {
 		if [ $previewFlag ] || [ $skipconfirmationFlag ] ; then
 			noconfirm=true
 		fi
-		assignArrays "$component"	
+		assignArrays "$component"
 		scrubArrays
 		logWildCards
 		componentSummary
 		for x in ${targethostloopvalues[@]}; 
 		do
+
 			targethost=$x
 			component="$y"
+			assignArrays "$component"
+			scrubArrays
+                	logWildCards
 			if [ ! $previewFlag ]; then
 				collect $targethost $component 
 			fi
@@ -666,24 +677,24 @@ function main {
 
 function logWildCards() {
 # Manipulate the Log array for all logs or not
-	if [ ! $alllogsFlag  ] ; then
-	       if [ "$component" != "general" ]; then
+	if [ ! $alllogsFlag  ]; then
         	lenLog=${#Log[@]}
                 countLog=1
                 for (( i=0; i<${lenLog}; i++ ));
                 	do
-                        	Log[$i]+="*.log"
+				if [ "${Log[$i]: -1}" = "/" ]; then
+					Log[$i]+="*.log"
+				fi
                         done
 
-		fi
 	fi
 }
 
 function componentSummary () {
 	echo ""
-	printf '%s' "Summary for hosts : "
+	printf 'Summary for component : %s\nDatestamp : %s\n' "$component" "$datestamp"
+	printf '%s' "Hosts : "
 	printf '%s, ' "${targethostloopvalues[@]}"| cut -d "," -f 1-${#targethostloopvalues[@]}
-	printf 'Component : %s\nDatestamp : %s\n' "$component" "$datestamp" 
 	printf '%s \n' "====================================================="
 	printf '%s ' "Commands  :"
 	printf '%s, ' "${Cmd[@]}" | cut -d "," -f 1-${#Cmd[@]}
