@@ -167,19 +167,15 @@ function assignArrays {
 component=$1
 
 case $component in
-        general)
-                declare -g Log=(        "/var/log/syslog"                 \
-s                                )
-                declare -g Cfg=(        "/etc/hosts"                   \
-                                )
-                declare -g Svc=(        "systemctl status ntpd.service"                              \
-                                )
-                declare -g Cmd=(        "free -h"    \
-                                        "df -h" \
-                                        "uname -a" \
-                                        "ntpq -p" \
-                                        "dmesg" \
-                                )
+       ntp.client)
+		declare -g Log=(        "/var/log/ntp.log"                \
+				)
+		declare -g Cfg=(        "/etc/ntp.conf"                   \
+				)
+		declare -g Svc=(        "systemctl status ntpd.service"                              \
+				)
+		declare -g Cmd=(        "ntpq -p"           \
+				)
         ;;
 
         keystone.server)
@@ -289,10 +285,11 @@ s                                )
 		declare -g Cmd=(        "virsh list"                          \
                                 	"ps -ef | grep libvirt" \
 					"ps -ef | grep 'nova'"\
-#					"for x in `virsh list | egrep -v 'Id|--' | awk '{print $2}'`; do echo '==='$x'===';virsh dumpxml $x; echo '' ;done" \
+#					"for x in \`virsh list | egrep -v 'Id|--' | awk '{print \$2}'\`; do echo \$x; virsh dumpxml \$x; done " \
+
 				)
                 declare -g Log=(        "/var/log/nova/"                           \
-                                        "/var/log/libvirt/"                             \
+					"/var/log/libvirt/qemu/"			\
                                 )
                 declare -g Svc=(        "service nova-compute status"                             \
                                 )
@@ -388,7 +385,7 @@ function collectFiles {
 	elif [ "$collectType" = "all" ]; then
 		sourceFile="`echo ${Cfg[@]} ${Log[@]}`"
 	fi
-	sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethost':'$remotetargetdir'/'$tarname' '$remotetargetdir'/'
+	sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethostip':'$remotetargetdir'/'$tarname' '$remotetargetdir'/'
 	if [ $runlocalFlag ]; then
 		ssh -q -oStrictHostKeyChecking=no $confighost $sshCollectFiles
 	else
@@ -418,13 +415,24 @@ function cleanCfgHost {
 function transferResultsCfg {
 	echo "Transferring results from $targethost to $confighost,$component..."
 	localdestdir="$remotetargetdir/$targethost"
-	sshXferResultsCfg='mkdir -p '$localdestdir';scp -o StrictHostKeyChecking=no -r '$targethost':'$remotetargetdir'/* '$localdestdir
+	sshXferResultsCfg='mkdir -p '$localdestdir';scp -o StrictHostKeyChecking=no -r '$targethostip':'$remotetargetdir'/* '$localdestdir
 	if [ $runlocalFlag ]; then
 		ssh -q -oStrictHostKeyChecking=no $confighost $sshXferResultsCfg
 	else
 		eval $sshXferResultsCfg
 	fi
 	echo "   complete."
+}
+
+
+function getIpAddrFromSalt {
+	host=$1
+	echo "Getting IP address for $host from reclass..."
+	sshgetipaddress="for x in \$(sudo salt '"*$host*"' network.ip_addrs|grep '-' | awk -F'-' '{print \$2}' | sed 's/ //g');do ping -c1 \$x 2>&1 >/dev/null; if [ \$? = 0 ];  then echo \$x ;break;fi; done"
+	echo $sshgetipaddress
+	targethostip=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
+#echo ${targethostip[@]}
+	echo "   complete"
 }
 
 function collectReclass {
@@ -485,7 +493,7 @@ function executeRemoteCommands {
         done
 	localdestdir="$remotetargetdir/$targethost"
 	sshExecuteRemoteCommands='mkdir -p '$localdestdir'/output; sudo salt "*'$targethost'*" cmd.run "'$sshExecuteRemoteCommands'" > '$localdestdir'/output/'$targethost'-'$component'-'$commandType''
-#        sshExecuteRemoteCommands='mkdir -p '$localdestdir'/output-'$datestamp'; sudo salt "*'$targethost'*" cmd.run "'$sshExecuteRemoteCommands'" > '$localdestdir'/output-'$datestamp'/'$targethost'-'$component'-'$commandType'-'$datestamp''
+	echo $sshExecuteRemoteCommands
 	if [ $runlocalFlag ]; then
 		ssh -q -oStrictHostKeyChecking=no $confighost $sshExecuteRemoteCommands
 	else
@@ -569,6 +577,9 @@ function hostsAssociatedWithSaltGrain {
 function collect {
 			targethost=$1
 			component=$2
+
+			getIpAddrFromSalt $targethost 
+	#		echo ${targethostip[@]}
 			echo "Collecting results for target host $targethost, $component"
                         echo "==========================================================="
                         executeRemoteCommands "cmd"
