@@ -117,6 +117,8 @@ function usage {
         echo "          REQUIRED : hostname or IP of the salt of config host."
         echo ""
         echo "    -y -- Autoconfirm -- Do not print confirmation and summary prompt"
+	echo ""
+	echo "For questions or suggeststions contact Jerry Keen, jkeen@mirantis.com."
 
         exit
 
@@ -201,7 +203,7 @@ case $component in
                 declare -g Cfg=(        "/etc/apache2/"                                \
                                 )
         ;;
-        neutroncontroller)
+        neutron.server)
                 declare -g Log=(        "/var/log/neutron/"                            \
                                 )
                 declare -g Cfg=(        "/etc/neutron/plugins/ml2/ml2_conf.ini"         \
@@ -212,7 +214,7 @@ case $component in
                 declare -g Cmd=(        "neutron agent-list"                            \
                                 )
         ;;
-        cindercontroller)
+        cinder.controller)
                 declare -g Log=(        "/var/log/cinder/"                         \
                                 )
                 declare -g Cfg=(        "/etc/cinder/"                                 \
