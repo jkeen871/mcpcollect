@@ -26,3 +26,6 @@ MCP Log/Diagnostics collection tool
           REQUIRED : hostname or IP of the salt of config host.
 
    -y -- Autoconfirm -- Do not print confirmation and summary prompt`
+
+
+For questions or suggeststions contact Jerry Keen, jkeen@mirantis.com.
