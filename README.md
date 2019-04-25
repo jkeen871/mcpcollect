@@ -14,7 +14,7 @@ salt grain, mcpcollect will query the reclass model and select the appropriate t
 files, logs, and run a set of commands to collect statistics or information abou the services related to the salt grain.
 
 
- mcpcollector -s cfg.host.exmple.net -g salt.grain1 -g salt.grain2 -h host1 -h host2 -y -l
+ mcpcollect -s cfg.host.exmple.net -g salt.grain1 -g salt.grain2 -h host1 -h host2 -y -l
 
    -a -- All logs -- Collect all logs from the specified log directory. 
           The default is to only collect *.log files, setting this switch will collect
