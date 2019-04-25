@@ -1,5 +1,4 @@
 #!/bin/bash
-
 #aodh.server
 #apache.server
 #aptly.publisher
@@ -380,7 +379,7 @@ function collectFiles {
 	elif [ "$collectType" = "all" ]; then
 		sourceFile="`echo ${Cfg[@]} ${Log[@]}`"
 	fi
-sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$localdestdir';tar czf '$localdestdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethostip':'$localdestdir'/'$tarname' '$localdestdir'/'
+sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethostip':'$remotetargetdir'/'$tarname' '$localdestdir'/'
 	if [ $runlocalFlag ]; then
 		ssh -q -oStrictHostKeyChecking=no $confighost $sshCollectFiles
 	else
@@ -423,7 +422,7 @@ function transferResultsCfg {
 function getIpAddrFromSalt {
 	host=$1
 	echo "Getting IP address for $host from reclass..."
-	sshgetipaddress="for x in \$(sudo salt '"*$host*"' network.ip_addrs|grep '-' | awk -F'-' '{print \$2}' | sed 's/ //g');do ping -c1 \$x 2>&1 >/dev/null; if [ \$? = 0 ];  then echo \$x ;break;fi; done"
+	sshgetipaddress="for x in \$(sudo salt '"*$host*"' network.ip_addrs|grep '-' | awk -F' - ' '{print \$2}' | sed 's/ //g');do ping -c1 \$x 2>&1 >/dev/null; if [ \$? = 0 ];  then echo \$x ;break;fi; done"
 	targethostip=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
 	echo "   complete"
 	if [ $runlocalFlag ]; then
@@ -604,7 +603,6 @@ function collect {
 			targethost=$1
 			component=$2
 
-#			getIpAddrFromSalt $targethost 
 			echo "Collecting results for target host $targethost, $component"
                         echo "==========================================================="
                         executeRemoteCommands "cmd"
