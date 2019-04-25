@@ -602,7 +602,7 @@ function collect {
 			targethost=$1
 			component=$2
 
-			getIpAddrFromSalt $targethost 
+#			getIpAddrFromSalt $targethost 
 			echo "Collecting results for target host $targethost, $component"
                         echo "==========================================================="
                         executeRemoteCommands "cmd"
@@ -683,7 +683,7 @@ function main {
                 	logWildCards
 			if [ ! $previewFlag ]; then
 				if [ "$targethostIP" = "" ]; then
-					getIpAddrFromSalt $hostname
+					getIpAddrFromSalt $targethost
 				fi
 				collect $targethost $component 
 			fi
@@ -711,7 +711,7 @@ function logWildCards() {
 
 function componentSummary () {
 	echo ""
-	printf 'Summary for component : %s\nDatestamp : %s\n' "$component" "$datestamp"
+	printf 'Summary for component : %s\nOutput  : %s\n' "$component" "$localtargetdir"
 	printf '%s' "Hosts : "
 	printf '%s, ' "${targethostloopvalues[@]}"| cut -d "," -f 1-${#targethostloopvalues[@]}
 	printf '%s \n' "====================================================="
