@@ -1,6 +1,18 @@
 # mcpcollect
 MCP Log/Diagnostics collection tool
 
+Note : at the time of writing this config the list of salt grains and related commands and collection information is incomplete
+       please contribute if you have something to add that will make this tool more useful.
+
+Note : This tool is not designed to modify or change anything in your MCP cluster.  Any suggestions to use this tool to
+       make system changes will be rejected.
+
+MCPCOLLECT is a tool designed to easily gather logs from your MCP environment for support or analysis. 
+
+The general premis of this tool is to collect information based on the installed salt.grains. By specifying the
+salt grain, mcpcollect will query the reclass model and select the appropriate targets hosts then collect config 
+files, logs, and run a set of commands to collect statistics or information abou the services related to the salt grain.
+
 
  mcpcollector -s cfg.host.exmple.net -g salt.grain1 -g salt.grain2 -h host1 -h host2 -y -l
 
