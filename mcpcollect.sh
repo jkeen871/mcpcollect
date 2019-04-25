@@ -89,6 +89,7 @@
 #telegraf.remote_agent
 #xtrabackup.client
 #xtrabackup.server
+#                                       "for x in \`virsh list | egrep -v 'Id|--' | awk '{print \$2}'\`; do echo \$x; virsh dumpxml \$x; done " \
 
 function usage {
         echo ""
@@ -100,15 +101,6 @@ function usage {
         echo "          This option will not work against component general, because that will collect all logs in"
         echo "          /var/log and could potentially consume too much disk on certain nodes"
         echo ""
-#        echo "    -c -- <component>"
-#        echo "          ceph-mon -- Retrieves ceph data from controller nodes"
-#        echo "          horizon -- Retrieves horizon data from controller nodes"
-#        echo "          keystone -- Retrieves keystone data from controller nodes"
-#        echo "          cinder-controller -- Retrieves cinder data from contoller nodes"
-#        echo "          nova-controller -- Retrieves nova data from controller nodes"
-#        echo "          neutron-controller -- Retrieves neutron data from controller nodes"
-#        echo "          reclass -- Retrieves reclass model from cfg/salt node"
-#        echo ""
         echo "    -g -- <salt grain>"
         echo "          Specify the salt grain name (ceph.mon, ceph.common) to collect information from"
         echo "          Hosts from grain are superceeded by host provided in -h"
@@ -240,7 +232,7 @@ case $component in
                                         "ceph df"                                       \
                                         "ceph pg dump | grep flags"                     \
                                         "ceph osd tree"                                 \
-                                        "ceph osd getcrushmap -o /tmp/mcpcollect/compiledmap; crushtool -d /tmp/mcpcollect/compiledmap; rm /tmp/mcpcollect/compiledmap" \
+                                        "ceph osd getcrushmap -o /tmp/compiledmap; crushtool -d /tmp/compiledmap; rm /tmp/compiledmap" \
                                 )
                 declare -g Log=(        "/var/log/ceph/"                        \ 
                                 )
@@ -378,7 +370,7 @@ function collectFiles {
 	collectType=$1
 	echo "Collecting $component files ($collectType) from $targethost"
 	tarname="$targethost-$component-files-$datestamp.tar.gz"
-
+	localdestdir="$remotetargetdir/$targethost"
 	if [ "$collectType" = "log" ]; then
 		sourceFile=("${Log[@]}")
 	elif [ "$collectType" = "cfg" ]; then
@@ -386,7 +378,7 @@ function collectFiles {
 	elif [ "$collectType" = "all" ]; then
 		sourceFile="`echo ${Cfg[@]} ${Log[@]}`"
 	fi
-	sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethostip':'$remotetargetdir'/'$tarname' '$remotetargetdir'/'
+sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$localdestdir';tar czf '$localdestdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethostip':'$localdestdir'/'$tarname' '$localdestdir'/'
 	if [ $runlocalFlag ]; then
 		ssh -q -oStrictHostKeyChecking=no $confighost $sshCollectFiles
 	else
@@ -432,6 +424,11 @@ function getIpAddrFromSalt {
 	sshgetipaddress="for x in \$(sudo salt '"*$host*"' network.ip_addrs|grep '-' | awk -F'-' '{print \$2}' | sed 's/ //g');do ping -c1 \$x 2>&1 >/dev/null; if [ \$? = 0 ];  then echo \$x ;break;fi; done"
 	targethostip=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
 	echo "   complete"
+	if [ $runlocalFlag ]; then
+		targethostip=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
+ 	else	
+		targethostip=$(eval $sshgetipaddress)
+	fi
 }
 
 function collectReclass {
@@ -555,7 +552,7 @@ function hostsAssociatedWithSaltGrain {
 	echo "Collecting hosts associated with $grain.."
 	grainhostvalues=($(getTargetHostByGrains "$grain"))
 	if [ ${#grainhostvalues[@]} = 0 ]; then 
-		abortmessage+=("$target host not found in garin $grain")
+		abortmessage+=("$target host not found in grain $grain")
 
 	fi
 	
@@ -666,6 +663,9 @@ function main {
 			scrubArrays
                 	logWildCards
 			if [ ! $previewFlag ]; then
+				if [ "$targethostIP" = "" ]; then
+					getIpAddrFromSalt $hostname
+				fi
 				collect $targethost $component 
 			fi
 			
