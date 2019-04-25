@@ -7,7 +7,7 @@ Note : at the time of writing this config the list of salt grains and related co
 Note : This tool is not designed to modify or change anything in your MCP cluster.  Any suggestions to use this tool to
        make system changes will be rejected.
 
-MCPCOLLECT is a tool designed to easily gather logs from your MCP environment for support or analysis. 
+MCPCOLLECT is a tool designed to easily gather logs from your Mirantis MCP environment for support or analysis. 
 
 The general premis of this tool is to collect information based on the installed salt.grains. By specifying the
 salt grain, mcpcollect will query the reclass model and select the appropriate targets hosts then collect config 
