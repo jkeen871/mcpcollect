@@ -4,7 +4,7 @@ MCP Log/Diagnostics collection tool
 
  mcpcollector -s cfg.host.exmple.net -g salt.grain1 -g salt.grain2 -h host1 -h host2 -y -l
 
-    -a -- All logs -- Collect all logs from the specified log directory.
+    \-a -- All logs -- Collect all logs from the specified log directory.
           The default is to only collect *.log files, setting this switch will collect
           all files in the log directory. 
           This option will not work against component general, because that will collect all logs in
