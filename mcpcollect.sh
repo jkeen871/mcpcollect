@@ -164,7 +164,7 @@ case $component in
 				)
 		declare -g Cfg=(        "/etc/ntp.conf"                   \
 				)
-		declare -g Svc=(        "systemctl status ntpd.service"                              \
+		declare -g Svc=(        "ntpd"                              \
 				)
 		declare -g Cmd=(        "ntpq -p"           \
 				)
@@ -175,7 +175,7 @@ case $component in
                                 )
                 declare -g Cfg=(        "/etc/keystone/"                   \
                                 )
-                declare -g Svc=(        "systemctl status apache2.service"                              \
+                declare -g Svc=(        "apache2"                              \
                                 )
                 declare -g Cmd=(        "netstat -nltp | grep apache2"           \
                                 )
@@ -185,7 +185,7 @@ case $component in
                                 )
                 declare -g Cfg=(        "/etc/keystone/"                   \
                                 )
-                declare -g Svc=(        "systemctl status apache2.service"                              \
+                declare -g Svc=(        "apache2"                              \
                                 )
                 declare -g Cmd=(                                                      \
                                 )
@@ -194,7 +194,7 @@ case $component in
                 declare -g Log=(        "/var/log/horizon/"                        \
                                         "/var/log/apache2/"
                                 )
-                declare -g Svc=(        "systemctl status apache2.service"                              \
+                declare -g Svc=(        "apache2"                              \
                                 )
                 declare -g Cmd=(        "netstat -nltp | egrep apache2"              \
                                 )
@@ -236,9 +236,9 @@ case $component in
                                 )
                 declare -g Log=(        "/var/log/ceph/"                        \ 
                                 )
-                declare -g Svc=(        "systemctl status ceph-mon.target"                                      \
-                                        "systemctl status ceph-mgr.target"                                      \
-                                        "systemctl status ceph.target"                                  \
+                declare -g Svc=(        "ceph-mon"                                      \
+                                        "ceph-mgr"                                      \
+                                        "ceph"                                  \
                                 )
                 declare -g Cfg=(        "/etc/ceph/"                                   \
                                 )
@@ -265,9 +265,9 @@ case $component in
                                 )
                 declare -g Log=(        "/var/log/ceph/"                        \
                                 )
-                declare -g Svc=(        "systemctl status ceph-mon.target"                                      \
-                                        "systemctl status ceph-mgr.target"                                      \
-                                        "systemctl status ceph.target"                                  \
+                declare -g Svc=(        "ceph-mon"                                      \
+                                        "ceph-mgr"                                      \
+                                        "ceph"                                  \
                                 )
                 declare -g Cfg=(        "/etc/ceph/"                                   \
                                 )
@@ -284,7 +284,7 @@ case $component in
 					"/var/log/libvirt/qemu/"			\
 					"/var/log/syslog"	\
                                 )
-                declare -g Svc=(        "service nova-compute status"                             \
+                declare -g Svc=(        "nova-compute"                             \
                                 )
 
                 declare -g Cfg=(        "/etc/nova/"                           \
@@ -302,9 +302,9 @@ case $component in
                 declare -g Log=(        "/var/log/nova/"                           \
                                         		                               \
                                 )
-                declare -g Svc=(        "systemctl status nova-api.service"                             \
-                                        "systemctl status nova-conductor.service"                       \
-                                        "systemctl status nova-scheduler.service"                       \
+                declare -g Svc=(        "nova-api"                             \
+                                        "nova-conductor"                       \
+                                        "nova-scheduler"                       \
                                 )
 
                 declare -g Cfg=(        "/etc/nova/"                           \
@@ -475,18 +475,28 @@ function executeRemoteCommands {
 		echo -e "${green} Array for type $commandType is empty.${nocolor}\n"
 		return 1
 	fi
-
+	processinit=$(checkProcessInitialization)
+                    
 	echo "Executing commands to $label ($commandType) from $targethost"
         lenCmd=${#remoteCmds[@]}
 	countCmd=1
         for (( i=0; i<${lenCmd}; i++ ));
         do
-                sshExecuteRemoteCommands+="echo '=';echo '==== ${remoteCmds[$i]}====';echo '=';${remoteCmds[$i]}"
-                if [ $countCmd -lt $lenCmd ]; then
+	if [ "$commandType" = "svc" ]; then
+		if [ "$processinit" = "systemd" ]; then
+			sshExecuteRemoteCommands+="echo '=';echo '==== ${remoteCmds[$i]}====';systemctl status '${remoteCmds[$i]}'"
+		elif [ "$processinit" = "sysvinit" ]; then
+			sshExecuteRemoteCommands+="echo '=';echo '==== ${remoteCmds[$i]}====';service '${remoteCmds[$i]}' status"
+		fi
+	elif [ "$commandType" = "cmd" ]; then
+		sshExecuteRemoteCommands+="echo '=';echo '==== ${remoteCmds[$i]}====';echo '=';${remoteCmds[$i]}"
+	fi
+	if [ $countCmd -lt $lenCmd ]; then
                         sshExecuteRemoteCommands+=";"
-                fi
-                ((countCmd++))
-        done
+        fi
+        	((countCmd++))
+
+	done
 	localdestdir="$remotetargetdir/$targethost"
 	sshExecuteRemoteCommands='mkdir -p '$localdestdir'/output; sudo salt "*'$targethost'*" cmd.run "'$sshExecuteRemoteCommands'" > '$localdestdir'/output/'$targethost'-'$component'-'$commandType''
 	if [ $runlocalFlag ]; then
@@ -494,6 +504,15 @@ function executeRemoteCommands {
 	else
 		eval $sshExecuteRemoteCommands
 	fi
+}
+function checkProcessInitialization () {
+	sshProcessInitialization='sudo salt "*'$targethost'*" cmd.run "if [ $(pidof init) ]; then echo sysvinit; fi;if [ $(pidof systemd) ]; then echo systemd; fi"| grep -v '$targethost''
+	if [ $runlocalFlag ]; then
+                result=$(ssh -q -oStrictHostKeyChecking=no $confighost $sshProcessInitialization) 
+        else
+                result=$(eval $sshProcessInitialization)
+        fi
+	echo $result 
 }
 
 function scrubArrays {
