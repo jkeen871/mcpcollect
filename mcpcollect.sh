@@ -1,4 +1,15 @@
 #!/bin/bash
+
+### TO DO ####
+#	Add support for returning relevent packages
+#	Complete salt grain lists
+#	Add switch for custom commands
+#	
+
+
+
+#### Grains
+
 #aodh.server
 #apache.server
 #aptly.publisher
@@ -92,7 +103,7 @@
 
 function usage {
         echo ""
-        echo "    mcpcollector -s <mmo-somehost> -g ceph.osd -h osd001 -h osd002 -y -l"
+	echo "    mcpcollector -s <mmo-somehost> -g ceph.osd -h osd001 -h osd002 -y -l"
         echo ""
         echo "    -a -- All logs -- Collect all logs from the specified log directory."
         echo "          The default is to only collect *.log files, setting this switch will collect"
@@ -106,14 +117,16 @@ function usage {
         echo ""
         echo "    -h -- <target hostname or IP>"
         echo "          The MCP host name of the systems you want to collect information from"
-        echo "          * Multiple host selections are supported (-h host1 -h host2)"
+        echo "		* Multiple host selections are supported (-h host1 -h host2)"
         echo ""
         echo "    -l -- Run on your localhost with ssh access to a Cfg or Salt node.  This option also requires the -s switch"
+	echo "		* Note this requires ssh keys to be installed from your local host to the cfg node, or you will be prompted"
+	echo "		  many times for your ssh password"
         echo ""
         echo "    -p -- Preview only --Do not collect any files, previews what will be collected for each grain"
         echo ""
         echo "    -s -- <cfg node or salt node>"
-        echo "          REQUIRED : hostname or IP of the salt of config host."
+        echo "		* REQUIRED : hostname or IP of the salt of config host."
         echo ""
         echo "    -y -- Autoconfirm -- Do not print confirmation and summary prompt"
 	echo ""
@@ -160,6 +173,17 @@ function assignArrays {
 component=$1
 
 case $component in
+        ceph.radosgw)
+                declare -g Log=(        "/var/log/ceph/"           \
+                                )
+                declare -g Cfg=(        "/etc/ceph"                   \
+                                )
+                declare -g Svc=(        "radosgw"                              \
+                                )
+                declare -g Cmd=(                   \
+                                )
+        ;;
+
 	rabbitmq.cluster | rabbitmq.server )
                 declare -g Log=(        "/var/log/rabbitmq/"                \
                                 )
@@ -170,6 +194,8 @@ case $component in
                 declare -g Cmd=(        "rabbitmqctl cluster_status"           \
 					"rabbitmqctl status"	\
 					"rabbitmqctl list_queues -p /openstack" \
+					"rabbitmqctl list_queues -p /openstack messages consumers name" \
+					"rabbitmqctl eval 'rabbit_diagnostics:maybe_stuck().'" \
                                 )
 	;;
  	ntp.client)
@@ -220,22 +246,33 @@ case $component in
                 declare -g Cfg=(        "/etc/neutron/plugins/ml2/ml2_conf.ini"         \
                                         "/etc/neutron/plugins/ml2/openvswitch_agent.ini"\
                                 )
-                declare -g Svc=(        "systemctl status neutron-openvswitch-agent.service"            \
+                declare -g Svc=(        "neutron-openvswitch-agent"            \
                                 )
                 declare -g Cmd=(        "neutron agent-list"                            \
                                 )
         ;;
-        cinder.controller)
+	cinder.volume)
                 declare -g Log=(        "/var/log/cinder/"                         \
                                 )
                 declare -g Cfg=(        "/etc/cinder/"                                 \
                                 )
-                declare -g Svc=(        "systemctl status cinder-scheduler.service"                     \
-                                        "systemctl status cinder-volume.service"                        \
+                declare -g Svc=(        "cinder-volume"                        \
                                 )
                 declare -g Cmd=(        "ls /var/lib/cinder/volumes"                    \
                                 )
         ;;
+	cinder.controller)
+                declare -g Log=(        "/var/log/cinder/"                         \
+                                )
+                declare -g Cfg=(        "/etc/cinder/"                                 \
+                                )
+                declare -g Svc=(        "cinder-scheduler"                     \
+                                        "cinder-volume"                        \
+                                )
+                declare -g Cmd=(        ""                    \
+                                )
+        ;;
+
         ceph.mon)
                 declare -g Cmd=(        "ceph --version"                                       \
                                         "ceph tell osd.* version"                       \
@@ -243,6 +280,7 @@ case $component in
                                         "ceph health detail"                            \
                                         "ceph -s"                                \
                                         "ceph df"                                       \
+					"ceph mon stat"			\
                                         "ceph pg dump | grep flags"                     \
                                         "ceph osd tree"                                 \
                                         "ceph osd getcrushmap -o /tmp/compiledmap; crushtool -d /tmp/compiledmap; rm /tmp/compiledmap" \
@@ -268,10 +306,13 @@ case $component in
                                         "netstat -a | grep ceph"        \
                                         "netstat -l | grep ceph"        \
                                         "ls -altrn /var/run/ceph"       \
-                                        "ceph osd dump | grep flags"
+					"ceph osd stat"			\
+					"ceph osd dump | grep flags"		\
                                         "ceph health detail"                            \
                                         "ceph -s"                                \
                                         "ceph df"                                       \
+					"ceph osd df"				\
+					"ceph osd perf"				\
                                         "ceph pg dump"                                  \
                                         "ceph osd tree"                                 \
                                         "ceph osd getcrushmap -o /tmp/compiledmap; crushtool -d /tmp/compiledmap; rm /tmp/compiledmap" \
