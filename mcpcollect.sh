@@ -160,7 +160,31 @@ function assignArrays {
 component=$1
 
 case $component in
-       ntp.client)
+	rabbitmq.cluster | rabbitmq.server )
+                declare -g Log=(        "/var/log/rabbitmq/"                \
+                                )
+                declare -g Cfg=(        "/etc/rabbitmq/"                   \
+                                )
+                declare -g Svc=(        "rabbitmq-server"               \
+                                )
+                declare -g Cmd=(        "rabbitmqctl cluster_status"           \
+					"rabbitmqctl status"	\
+					"rabbitmqctl list_queues -p /openstack" \
+                                )
+	;;
+#	rabbitmq.server)
+#		declare -g Log=(        "/var/log/rabbitmq/"                \
+#                                )
+#                declare -g Cfg=(        "/etc/rabbitmq/"                   \
+#                                )
+#                declare -g Svc=(        "rabbitmq-server"               \
+#                                )
+#                declare -g Cmd=(        "rabbitmqctl cluster_status"           \
+#                                        "rabbitmqctl status"    \
+#					"rabbitmqctl list_queues -p /openstack" \
+#                                )
+#	;;
+ 	ntp.client)
 		declare -g Log=(        "/var/log/ntp.log"                \
 				)
 		declare -g Cfg=(        "/etc/ntp.conf"                   \
@@ -481,16 +505,18 @@ function executeRemoteCommands {
 	echo "Executing commands to $label ($commandType) from $targethost"
         lenCmd=${#remoteCmds[@]}
 	countCmd=1
+	outputFooter="----------------------------"
         for (( i=0; i<${lenCmd}; i++ ));
         do
+	outputHeader="@@@=========================================== ${remoteCmds[$i]} ==========================================="		
 	if [ "$commandType" = "svc" ]; then
 		if [ "$processinit" = "systemd" ]; then
-			sshExecuteRemoteCommands+="echo '=';echo '==== ${remoteCmds[$i]}====';systemctl status '${remoteCmds[$i]}'"
+			sshExecuteRemoteCommands+="echo $outputHeader;echo ;systemctl status '${remoteCmds[$i]}';echo;echo $outputFooter;echo"
 		elif [ "$processinit" = "sysvinit" ]; then
-			sshExecuteRemoteCommands+="echo '=';echo '==== ${remoteCmds[$i]}====';service '${remoteCmds[$i]}' status"
+			sshExecuteRemoteCommands+="echo $outputHeader;echo ;service '${remoteCmds[$i]}' status;echo;echo $outputFooter;echo"
 		fi
 	elif [ "$commandType" = "cmd" ]; then
-		sshExecuteRemoteCommands+="echo '=';echo '==== ${remoteCmds[$i]}====';echo '=';${remoteCmds[$i]}"
+		sshExecuteRemoteCommands+="echo $outputHeader;echo ;${remoteCmds[$i]}; echo;echo $outputFooter;echo"
 	fi
 	if [ $countCmd -lt $lenCmd ]; then
                         sshExecuteRemoteCommands+=";"
