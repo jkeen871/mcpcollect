@@ -173,6 +173,18 @@ function assignArrays {
 component=$1
 
 case $component in
+	haproxy.proxy)
+		declare -g Log=(        "/var/log/haproxy*"         \
+                                )
+                declare -g Cfg=(        "/etc/haproxy"                   \
+                                )
+                declare -g Svc=(        "haproxy"                       \
+                                )
+                declare -g Cmd=(        "haproxy -vv" 		\
+					"netstat -lntp" 	\
+					"echo 'show info;show stat;show pools' | nc -U /var/run/haproxy/admin.sock" \
+                                )
+	;;
         ceph.radosgw)
                 declare -g Log=(        "/var/log/ceph/"           \
                                 )
