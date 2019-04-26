@@ -172,18 +172,6 @@ case $component in
 					"rabbitmqctl list_queues -p /openstack" \
                                 )
 	;;
-#	rabbitmq.server)
-#		declare -g Log=(        "/var/log/rabbitmq/"                \
-#                                )
-#                declare -g Cfg=(        "/etc/rabbitmq/"                   \
-#                                )
-#                declare -g Svc=(        "rabbitmq-server"               \
-#                                )
-#                declare -g Cmd=(        "rabbitmqctl cluster_status"           \
-#                                        "rabbitmqctl status"    \
-#					"rabbitmqctl list_queues -p /openstack" \
-#                                )
-#	;;
  	ntp.client)
 		declare -g Log=(        "/var/log/ntp.log"                \
 				)
