@@ -262,7 +262,7 @@ case $component in
                 declare -g Svc=(        "cinder-scheduler"                     \
                                         "cinder-volume"                        \
                                 )
-                declare -g Cmd=(        "cinder list"                    \
+                declare -g Cmd=(        "cinder list" \
                                 )
         ;;
 	docker.swarm)
@@ -756,6 +756,8 @@ function main {
 		scrubArrays
 		logWildCards
 		componentSummary
+		parseArrays log 
+		exit
 		for x in ${targethostloopvalues[@]}; 
 		do
 
@@ -792,20 +794,50 @@ function logWildCards() {
 	fi
 }
 
+parseArrays () {
+	case $1 in 
+		cmd) 
+			if [ "${#Cmd[@]}" = "0" ]; then
+				string="<none>"
+			else
+				string=$(printf '%s, ' "${Cmd[@]}" | cut -d "," -f 1-${#Cmd[@]})
+			fi
+		;;
+		log)
+                        if [ "${#Log[@]}" = "0" ]; then
+                                string="<none>"
+                        else
+				string=$(printf '%s, ' "${Log[@]}" | cut -d "," -f 1-${#Log[@]})
+			fi
+		;;
+		svc)
+			if [ "${#Svc[@]}" = "0" ]; then
+                                string="<none>"
+                        else
+				string=$(printf '%s, ' "${Svc[@]}"| cut -d "," -f 1-${#Svc[@]})
+			fi
+		;;
+		cfg)
+			if [ "${#Cfg[@]}" = "0" ]; then
+                                string="<none>"
+                        else
+				string=$(printf '%s, ' "${Cfg[@]}"| cut -d "," -f 1-${#Cfg[@]})
+			fi
+		;;
+	esac
+	echo $string
+}
+
 function componentSummary () {
 	echo ""
 	printf 'Summary for component : %s\nOutput  : %s\n' "$component" "$localtargetdir"
 	printf '%s' "Hosts : "
 	printf '%s, ' "${targethostloopvalues[@]}"| cut -d "," -f 1-${#targethostloopvalues[@]}
 	printf '%s \n' "====================================================="
-	printf '%s ' "Commands  :"
-	printf '%s, ' "${Cmd[@]}" | cut -d "," -f 1-${#Cmd[@]}
-	printf '%s ' "Logs      :"
-	printf '%s, ' "${Log[@]}" | cut -d "," -f 1-${#Log[@]}
-	printf '%s ' "Services  :"
-	printf '%s, ' "${Svc[@]}"| cut -d "," -f 1-${#Svc[@]} 
-	printf '%s ' "Configs   :"
-	printf '%s, ' "${Cfg[@]}"| cut -d "," -f 1-${#Cfg[@]}
+	printf '%s %s\n' "Commands  :" "$(parseArrays cmd)"
+	printf '%s %s\n' "Logs      :" "$(parseArrays log)"
+	printf '%s %s\n' "Services  :" "$(parseArrays svc)"
+	printf '%s %s\n' "Configs   :" "$(parseArrays cfg)"
 	printf '%s \n' "-----------------------------------------------------"
 	echo ""
 	if [ ! $noconfirm ]; then
