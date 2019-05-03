@@ -176,255 +176,276 @@ nocolor='\033[0m'
 red='\e[1;31m'
 
 function assignArrays {
-component=$1
+	component=$1
 
-case $component in 
-        ceph.mon)
-                declare -g Cmd=(        "ceph --version"                                       \
-                                        "ceph tell osd.* version"                       \
-                                        "ceph tell mon.* version"
-                                        "ceph health detail"                            \
-                                        "ceph -s"                                \
-                                        "ceph df"                                       \
-                                        "ceph mon stat"                 \
-                                        "ceph pg dump | grep flags"                     \
-                                        "ceph osd tree"                                 \
-                                        "ceph osd getcrushmap -o /tmp/compiledmap; crushtool -d /tmp/compiledmap; rm /tmp/compiledmap" \
-                                )
-                declare -g Log=(        "/var/log/ceph/"                        \
-                                )
-                declare -g Svc=(        "ceph-mon"                                      \
-                                        "ceph-mgr"                                      \
-                                        "ceph"                                  \
-                                )
-                declare -g Cfg=(        "/etc/ceph/"                                   \
-                                )
-        ;;
-        ceph.osd)
-                declare -g Cmd=(        "ceph --version"                                       \
-                                        "ceph tell osd.* version"                       \
-                                        "ceph tell mon.* version"
-                                        "dmesg"         \
-                                        "ps -ef | grep osd"
-                                        "netstat -p | grep ceph"        \
-                                        "df -h"  \
-                                        "mount" \
-                                        "lsblk" \
-                                        "netstat -a | grep ceph"        \
-                                        "netstat -l | grep ceph"        \
-                                        "ls -altrn /var/run/ceph"       \
-                                        "ceph osd stat"                 \
-                                        "ceph osd dump | grep flags"            \
-                                        "ceph health detail"                            \
-                                        "ceph -s"                                \
-                                        "ceph df"                                       \
-                                        "ceph osd df"                           \
-                                        "ceph osd perf"                         \
-                                        "ceph pg dump"                                  \
-                                        "ceph osd tree"                                 \
-                                        "ceph osd getcrushmap -o /tmp/compiledmap; crushtool -d /tmp/compiledmap; rm /tmp/compiledmap" \
-                                )
-                declare -g Log=(        "/var/log/ceph/"                        \
-                                )
-                declare -g Svc=(        "ceph-mon"                                      \
-                                        "ceph-mgr"                                      \
-                                        "ceph"                                  \
-                                )
-                declare -g Cfg=(        "/etc/ceph/"                                   \
-                                )
-	;;
-	ceph.radosgw)
-                declare -g Log=(        "/var/log/ceph/"           \
-                                )
-                declare -g Cfg=(        "/etc/ceph"                   \
-                                )
-                declare -g Svc=(        "radosgw"                              \
-                                )
-                declare -g Cmd=(                   \
-                                )
-        ;;
-
-	cinder.volume)
-                declare -g Log=(        "/var/log/cinder/"                         \
-                                )
-                declare -g Cfg=(        "/etc/cinder/"                                 \
-                                )
-                declare -g Svc=(        "cinder-volume"                        \
-                                )
-                declare -g Cmd=(        "ls /var/lib/cinder/volumes"                    \
-                                )
-        ;;
-        cinder.controller)
-                declare -g Log=(        "/var/log/cinder/"                         \
-                                )
-                declare -g Cfg=(        "/etc/cinder/"                                 \
-                                )
-                declare -g Svc=(        "cinder-scheduler"                     \
-                                        "cinder-volume"                        \
-                                )
-                declare -g Cmd=(        "cinder list" \
-                                )
-        ;;
-	docker.swarm)
-                declare -g Log=(        "/var/log/docker/"           \
-                                )
-                declare -g Cfg=(        "/etc/docker/"                   \
-                                )
-                declare -g Svc=(        "dockerd"                              \
-                                )
-                declare -g Cmd=(        "docker version"\
-					"docker info"		\
-                                )
-        ;;
-	elasticsearch.server)
-                declare -g Log=(        "/var/log/elasticsearch/"           \
-                                )
-                declare -g Cfg=(        "/etc/elasticsearch/"                   \
-                                )
-                declare -g Svc=(        "elasticsearch"                              \
-                                )
-                declare -g Cmd=(	"curl -X GET 'http://log01:9200/_cat/health?v'" \
-					"curl -X GET 'http://log01:9200/_cat/indices?v' | /bin/grep -v status | /usr/bin/wc -l"
-                                )
-
-	;;
-	fluentd.agent)
-		declare -g Log=(        "/var/log/td-agent/"           \
-                                )
-                declare -g Cfg=(        "/etc/td-agent/"                   \
-                                )
-                declare -g Svc=(        "td-agent"                              \
-                                )
-                declare -g Cmd=(       
-                                )
-
-	;;
-	haproxy.proxy)
-                declare -g Log=(        "/var/log/haproxy*"         \
-                                )
-                declare -g Cfg=(        "/etc/haproxy"                   \
-                                )
-                declare -g Svc=(        "haproxy"                       \
-                                )
-                declare -g Cmd=(        "haproxy -vv"           \
-                                        "netstat -lntp"         \
-                                        "echo 'show info;show stat;show pools' | nc -U /var/run/haproxy/admin.sock" \
-                                )
-        ;;
-        horizon.server)
-                declare -g Log=(        "/var/log/horizon/"                        \
-                                        "/var/log/apache2/"
-                                )
-                declare -g Svc=(        "apache2"                              \
-                                )
-                declare -g Cmd=(        "netstat -nltp | egrep apache2"              \
-                                )
-                declare -g Cfg=(        "/etc/apache2/"                                \
-                                )
-        ;;
-        keystone.server)
-                declare -g Log=(        "/var/log/keystone/" \
-   					"/var/log/apache2/"\
-                                )
-                declare -g Cfg=(        "/etc/keystone/"                   \
-					"/etc/apache2/" \
-                                )
-                declare -g Svc=(        "apache2"                              \
-                                )
-                declare -g Cmd=(        "netstat -nltp | grep apache2"           \
-                                )
-        ;;
-        keystone.client)
-                declare -g Log=(        "/var/log/keystone/"                       \
-                                )
-                declare -g Cfg=(        "/etc/keystone/"                   \
-                                )
-                declare -g Svc=(        "apache2"                              \
-                                )
-                declare -g Cmd=(                                                      \
-                                )
-        ;;
-	neutron.server)
-                declare -g Log=(        "/var/log/neutron/"                            \
-                                )
-                declare -g Cfg=(        "/etc/neutron/"         \
-                                )
-                declare -g Svc=(        "neutron-openvswitch-agent"            \
-                                )
-                declare -g Cmd=(        "neutron agent-list"                            \
-                                )
-	;;
-	ntp.client)
-                declare -g Log=(        "/var/log/ntp.log"                \
-                                )
-                declare -g Cfg=(        "/etc/ntp.conf"                   \
-                                )
-                declare -g Svc=(        "ntpd"                              \
-                                )
-                declare -g Cmd=(        "ntpq -p"           \
-                                )
-        ;;
-	nova.compute)		               
-		declare -g Cmd=(        "virsh list"                          \
-                                	"ps -ef | grep libvirt" \
-					"ps -ef | grep 'nova'"\
-#					"for x in \`virsh list | egrep -v 'Id|--' | awk '{print \$2}'\`; do echo \$x; virsh dumpxml \$x; done " \
-
+	declare -g generalCmd=(		"uname -a"\
+					"df -h" \
+					"mount" \
+					"du -h --max-depth=1 /" \
+					"lsblk" \
+					"free -h"\
+					"ifconfig"\
+					"ps au --sort=-rss"\
+					"salt-call pkg.list_pkgs versions_as_list=True" \
+					"ntpq -p"\
 				)
-                declare -g Log=(        "/var/log/nova/"                           \
-					"/var/log/libvirt/qemu/"			\
-					"/var/log/syslog"	\
-                                )
-                declare -g Svc=(        "nova-compute"                             \
-                                )
+	declare -g generalCfg=(		"/etc/hosts"\
+				)
+	declare -g generalLog=(		"/var/log/syslog" \
+				)
+	declare -g generalSvc=()
 
-                declare -g Cfg=(        "/etc/nova/"                           \
-					"/etc/libvirt/"
-                                )
-	;;
-	nova.controller)
-                ### Nova ###
-                declare -g Cmd=(        "nova hypervisor-list"                          \
-                                        "nova list --fields name,networks,host --all-tenants" \
-					"nova service-list"\
-                                )
-                declare -g Log=(        "/var/log/nova/"                           \
-                                        		                               \
-                                )
-                declare -g Svc=(        "nova-api"                             \
-                                        "nova-conductor"                       \
-                                        "nova-scheduler"                       \
-                                )
+	case $component in 
+		ceph.mon)
+			declare -g Cmd=(   	"ceph --version"                                       \
+						"ceph tell osd.* version"                       \
+						"ceph tell mon.* version"
+						"ceph health detail"                            \
+						"ceph -s"                                \
+						"ceph df"                                       \
+						"ceph mon stat"                 \
+						"ceph pg dump | grep flags"                     \
+						"ceph osd tree"                                 \
+						"ceph osd getcrushmap -o /tmp/compiledmap; crushtool -d /tmp/compiledmap; rm /tmp/compiledmap" \
+					)
+			declare -g Log=(        "/var/log/ceph/"                        \
+					)
+			declare -g Svc=(        "ceph-mon"                                      \
+						"ceph-mgr"                                      \
+						"ceph"                                  \
+					)
+			declare -g Cfg=(        "/etc/ceph/"                                   \
+					)
+		;;
+		ceph.osd)
+			declare -g Cmd=(        "ceph --version"                                       \
+						"ceph tell osd.* version"                       \
+						"ceph tell mon.* version"
+						"dmesg"         \
+						"ps -ef | grep osd"
+						"netstat -p | grep ceph"        \
+						"df -h"  \
+						"mount" \
+						"lsblk" \
+						"netstat -a | grep ceph"        \
+						"netstat -l | grep ceph"        \
+						"ls -altrn /var/run/ceph"       \
+						"ceph osd stat"                 \
+						"ceph osd dump | grep flags"            \
+						"ceph health detail"                            \
+						"ceph -s"                                \
+						"ceph df"                                       \
+						"ceph osd df"                           \
+						"ceph osd perf"                         \
+						"ceph pg dump"                                  \
+						"ceph osd tree"                                 \
+						"ceph osd getcrushmap -o /tmp/compiledmap; crushtool -d /tmp/compiledmap; rm /tmp/compiledmap" \
+					)
+			declare -g Log=(        "/var/log/ceph/"                        \
+					)
+			declare -g Svc=(        "ceph-mon"                                      \
+						"ceph-mgr"                                      \
+						"ceph"                                  \
+					)
+			declare -g Cfg=(        "/etc/ceph/"                                   \
+					)
+		;;
+		ceph.radosgw)
+			declare -g Log=(        "/var/log/ceph/"           \
+					)
+			declare -g Cfg=(        "/etc/ceph"                   \
+					)
+			declare -g Svc=(        "radosgw"                              \
+					)
+			declare -g Cmd=(                   \
+					)
+		;;
 
-                declare -g Cfg=(        "/etc/nova/"                           \
-                                )
+		cinder.volume)
+			declare -g Log=(        "/var/log/cinder/"                         \
+					)
+			declare -g Cfg=(        "/etc/cinder/"                                 \
+					)
+			declare -g Svc=(        "cinder-volume"                        \
+					)
+			declare -g Cmd=(        "ls /var/lib/cinder/volumes"                    \
+					)
+		;;
+		cinder.controller)
+			declare -g Log=(        "/var/log/cinder/"                         \
+					)
+			declare -g Cfg=(        "/etc/cinder/"                                 \
+					)
+			declare -g Svc=(        "cinder-scheduler"                     \
+						"cinder-volume"                        \
+					)
+			declare -g Cmd=(        "cinder list" \
+					)
+		;;
+		docker.swarm)
+			declare -g Log=(        "/var/log/docker/"           \
+					)
+			declare -g Cfg=(        "/etc/docker/"                   \
+					)
+			declare -g Svc=(        "dockerd"                              \
+					)
+			declare -g Cmd=(        "docker version"\
+						"docker info"		\
+					)
+		;;
+		elasticsearch.server)
+			declare -g Log=(        "/var/log/elasticsearch/"           \
+					)
+			declare -g Cfg=(        "/etc/elasticsearch/"                   \
+					)
+			declare -g Svc=(        "elasticsearch"                              \
+					)
+			declare -g Cmd=(	"curl -X GET 'http://log01:9200/_cat/health?v'" \
+						"curl -X GET 'http://log01:9200/_cat/indices?v'"\
+					)
 
-	;;
-        rabbitmq.cluster | rabbitmq.server )
-                declare -g Log=(        "/var/log/rabbitmq/"                \
-                                )
-                declare -g Cfg=(        "/etc/rabbitmq/"                   \
-                                )
-                declare -g Svc=(        "rabbitmq-server"               \
-                                )
-                declare -g Cmd=(        "rabbitmqctl cluster_status"           \
-                                        "rabbitmqctl status"    \
-                                        "rabbitmqctl list_queues -p /openstack" \
-                                        "rabbitmqctl list_queues -p /openstack messages consumers name" \
-                                        "rabbitmqctl eval 'rabbit_diagnostics:maybe_stuck().'" \
-                                )
-        ;;
+		;;
+		fluentd.agent)
+			declare -g Log=(        "/var/log/td-agent/"           \
+					)
+			declare -g Cfg=(        "/etc/td-agent/"                   \
+					)
+			declare -g Svc=(        "td-agent"                              \
+					)
+			declare -g Cmd=(       
+					)
 
-        reclass)
-                ### Reclas Model ###
-                declare -a Cmd=("tar -zcvf reclass-$datestamp.tar.gz /var/salt/reclass $targetdir")
-        ;;
-esac
+		;;
+		haproxy.proxy)
+			declare -g Log=(        "/var/log/haproxy*"         \
+					)
+			declare -g Cfg=(        "/etc/haproxy"                   \
+					)
+			declare -g Svc=(        "haproxy"                       \
+					)
+			declare -g Cmd=(        "haproxy -vv"           \
+						"netstat -lntp"         \
+						"echo 'show info;show stat;show pools' | nc -U /var/run/haproxy/admin.sock" \
+					)
+		;;
+		horizon.server)
+			declare -g Log=(        "/var/log/horizon/"                        \
+						"/var/log/apache2/"
+					)
+			declare -g Svc=(        "apache2"                              \
+					)
+			declare -g Cmd=(        "netstat -nltp | egrep apache2"              \
+					)
+			declare -g Cfg=(        "/etc/apache2/"                                \
+					)
+		;;
+		keystone.server)
+			declare -g Log=(        "/var/log/keystone/" \
+						"/var/log/apache2/"\
+					)
+			declare -g Cfg=(        "/etc/keystone/"                   \
+						"/etc/apache2/" \
+					)
+			declare -g Svc=(        "apache2"                              \
+					)
+			declare -g Cmd=(        "netstat -nltp | grep apache2"           \
+					)
+		;;
+		keystone.client)
+			declare -g Log=(        "/var/log/keystone/"                       \
+					)
+			declare -g Cfg=(        "/etc/keystone/"                   \
+					)
+			declare -g Svc=(        "apache2"                              \
+					)
+			declare -g Cmd=(                                                      \
+					)
+		;;
+		neutron.server)
+			declare -g Log=(        "/var/log/neutron/"                            \
+					)
+			declare -g Cfg=(        "/etc/neutron/"         \
+					)
+			declare -g Svc=(        "neutron-openvswitch-agent"            \
+					)
+			declare -g Cmd=(        "neutron agent-list"                            \
+					)
+		;;
+		ntp.client)
+			declare -g Log=(        "/var/log/ntp.log"                \
+					)
+			declare -g Cfg=(        "/etc/ntp.conf"                   \
+					)
+			declare -g Svc=(        "ntpd"                              \
+					)
+			declare -g Cmd=(        "ntpq -p"           \
+					)
+		;;
+		nova.compute)		               
+			declare -g Cmd=(        "virsh list"                          \
+						"ps -ef | grep libvirt" \
+						"ps -ef | grep 'nova'"\
+	#					"for x in \`virsh list | egrep -v 'Id|--' | awk '{print \$2}'\`; do echo \$x; virsh dumpxml \$x; done " \
+
+					)
+			declare -g Log=(        "/var/log/nova/"                           \
+						"/var/log/libvirt/qemu/"			\
+						"/var/log/syslog"	\
+					)
+			declare -g Svc=(        "nova-compute"                             \
+					)
+
+			declare -g Cfg=(        "/etc/nova/"                           \
+						"/etc/libvirt/"
+					)
+		;;
+		nova.controller)
+			### Nova ###
+			declare -g Cmd=(        "nova hypervisor-list"                          \
+						"nova list --fields name,networks,host --all-tenants" \
+						"nova service-list"\
+					)
+			declare -g Log=(        "/var/log/nova/"                           \
+											       \
+					)
+			declare -g Svc=(        "nova-api"                             \
+						"nova-conductor"                       \
+						"nova-scheduler"                       \
+					)
+
+			declare -g Cfg=(        "/etc/nova/"                           \
+					)
+
+		;;
+		rabbitmq.cluster | rabbitmq.server )
+			declare -g Log=(        "/var/log/rabbitmq/"                \
+					)
+			declare -g Cfg=(        "/etc/rabbitmq/"                   \
+					)
+			declare -g Svc=(        "rabbitmq-server"               \
+					)
+			declare -g Cmd=(        "rabbitmqctl cluster_status"           \
+						"rabbitmqctl status"    \
+						"rabbitmqctl list_queues -p /openstack" \
+						"rabbitmqctl list_queues -p /openstack messages consumers name" \
+						"rabbitmqctl eval 'rabbit_diagnostics:maybe_stuck().'" \
+					)
+		;;
+
+		reclass)
+			### Reclas Model ###
+			declare -a Cmd=("tar -zcvf reclass-$datestamp.tar.gz /var/salt/reclass $targetdir")
+		;;
+	esac
+	Cmd=("${generalCmd[@]}" "${Cmd[@]}")
+	Log=("${generalLog[@]}" "${Log[@]}")
+	Cfg=("${generalCfg[@]}" "${Cfg[@]}")
+	Svc=("${generalSvc[@]}" "${Svc[@]}")
 }
 
 function abortprompt {
- read -p " Do you want to continue? [y/n] " -n 1 -r
- echo -e "${nocolor}\n"
+	read -p " Do you want to continue? [y/n] " -n 1 -r
+	echo -e "${nocolor}\n"
         if [[ $REPLY =~ ^[Yy]$ ]]
         then
 		echo ""
