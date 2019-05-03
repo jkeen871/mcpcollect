@@ -276,7 +276,29 @@ case $component in
 					"docker info"		\
                                 )
         ;;
+	elasticsearch.server)
+                declare -g Log=(        "/var/log/elasticsearch/"           \
+                                )
+                declare -g Cfg=(        "/etc/elasticsearch/"                   \
+                                )
+                declare -g Svc=(        "elasticsearch"                              \
+                                )
+                declare -g Cmd=(	"curl -X GET 'http://log01:9200/_cat/health?v'" \
+					"curl -X GET 'http://log01:9200/_cat/indices?v' | /bin/grep -v status | /usr/bin/wc -l"
+                                )
 
+	;;
+	fluentd.agent)
+		declare -g Log=(        "/var/log/td-agent/"           \
+                                )
+                declare -g Cfg=(        "/etc/td-agent/"                   \
+                                )
+                declare -g Svc=(        "td-agent"                              \
+                                )
+                declare -g Cmd=(       
+                                )
+
+	;;
 	haproxy.proxy)
                 declare -g Log=(        "/var/log/haproxy*"         \
                                 )
@@ -756,8 +778,6 @@ function main {
 		scrubArrays
 		logWildCards
 		componentSummary
-		parseArrays log 
-		exit
 		for x in ${targethostloopvalues[@]}; 
 		do
 
