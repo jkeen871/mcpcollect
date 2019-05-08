@@ -1,5 +1,22 @@
 #!/bin/bash
 
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    <http://www.gnu.org/licenses/>.
+#
+
+
+
+
 ### TO DO ####
 #	Add support for returning relevent packages
 #	Complete salt grain lists
@@ -178,6 +195,8 @@ red='\e[1;31m'
 function assignArrays {
 	component=$1
 
+	### For empty arrays, i.e.: no commands in the cmd array, do not put an empty space ("") leave the array empty.   For example use : cmd=(), Do not use cmd=("").
+
 	declare -g generalCmd=(		"uname -a"\
 					"df -h" \
 					"mount" \
@@ -194,6 +213,8 @@ function assignArrays {
 	declare -g generalLog=(		"/var/log/syslog" \
 				)
 	declare -g generalSvc=()
+
+	declare -g generalJct=()
 
 	case $component in 
 		ceph.mon)
@@ -436,6 +457,23 @@ function assignArrays {
 			### Reclas Model ###
 			declare -a Cmd=("tar -zcvf reclass-$datestamp.tar.gz /var/salt/reclass $targetdir")
 		;;
+		telegraf.agent )
+                        declare -g Jct=(        "journalctl -x -u telegraf --no-page"                \
+						"journalctl -x -u otherone --no-page" \
+					)
+			declare -g Log=()
+                        declare -g Cfg=(        "/etc/telegraf"			\
+                                        )
+                        declare -g Svc=(        "telegraf"                              \
+                                        )
+                        declare -g Cmd=(                  \
+                                        )
+		;;
+		*)
+			abortmessage+="no valid grains provided"
+			abort
+		;;
+
 	esac
 	Cmd=("${generalCmd[@]}" "${Cmd[@]}")
 	Log=("${generalLog[@]}" "${Log[@]}")
@@ -491,6 +529,26 @@ function abort {
 	exit
 }
 
+function collectJournalCtl {
+	journalCommand="mkdir -p $remotetargetdir/var/log;cd $remotetargetdir/var/log;"
+	lenJct=${#Jct[@]}
+                countJct=1
+                for (( i=0; i<${lenJct}; i++ ));
+                        do
+				journalCommand+=$(echo ${Jct[$i]} | grep -o "\-u.*" | awk -v a="$targethost" -v b="$component" -v c="$datestamp" -v d="$remotetargetdir" -v e="${Jct[$i]}" '{print e"|gzip > "a"-journal-"$2"-"c".log.gz;"}')
+                        done
+			sshJournalCollectFiles='sudo salt "*'$targethost'*" cmd.run "'$journalCommand'"'
+
+        if [ $runlocalFlag ]; then
+                ssh -q -oStrictHostKeyChecking=no $confighost $sshJournalCollectFiles
+        else
+                eval $sshCollectFiles
+        fi
+        echo "   complete."
+
+
+}
+
 function collectFiles {
 	collectType=$1
 	echo "Collecting $component files ($collectType) from $targethost"
@@ -501,15 +559,20 @@ function collectFiles {
 	elif [ "$collectType" = "cfg" ]; then
 		sourceFile=("${Cfg[@]}")
 	elif [ "$collectType" = "all" ]; then
-		sourceFile="`echo ${Cfg[@]} ${Log[@]}`"
+		sourceFile=("`echo ${Cfg[@]} ${Log[@]}`")
 	fi
-sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethostip':'$remotetargetdir'/'$tarname' '$localdestdir'/'
-	if [ $runlocalFlag ]; then
-		ssh -q -oStrictHostKeyChecking=no $confighost $sshCollectFiles
-	else
-		eval $sshCollectFiles
+	sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethostip':'$remotetargetdir'/'$tarname' '$localdestdir'/'
+
+	if [ "${#sourceFile[@]}" > 0  ]; then
+		if [ $runlocalFlag ]; then
+			ssh -q -oStrictHostKeyChecking=no $confighost $sshCollectFiles
+		else
+			eval $sshCollectFiles
+		fi
+		echo "   complete."
+	else 
+		echo -e "${green} No files defined for collection in $component.${nocolor}\n"
 	fi
-	echo "   complete."
 }
 
 function cleanTargethost {
@@ -671,7 +734,15 @@ function scrubArrays {
                         if [ "${Cfg[$i]}" = " " ] ; then
                                 unset Cfg[$i]
                         fi
+		done
+	lenJct=${#Jct[@]}
+        for (( i=0; i<${lenJct}; i++ ));
+                do
+                        if [ "${Jct[$i]}" = " " ] ; then
+                                unset Jct[$i]
+                        fi
                 done
+
 }
 
 
@@ -731,9 +802,10 @@ function collect {
 
 			echo "Collecting results for target host $targethost, $component"
                         echo "==========================================================="
-                        executeRemoteCommands "cmd"
+			executeRemoteCommands "cmd"
                         executeRemoteCommands "svc"
                         collectFiles "all"
+			collectJournalCtl
                         transferResultsCfg
 			cleanTargethost
 			collectReclass
@@ -751,6 +823,12 @@ function collect {
 
 function main {
 	
+# assignArrays "$component"
+#        scrubArrays
+#        journalstring=$(printf '%s > %s/%s'"${Log[@]}" "$remotetargetdir" "somelog.zip" | cut -d ";" -f 1-${#Log[@]})
+#        echo $journalstring
+#        exit
+
 	targethostloopvalues=(${targethostvalues[@]});
 
 	if [ "$confighost" != "" ]; then
@@ -767,7 +845,6 @@ function main {
 
         if [ ${#componentvalues[@]} = 0 ] && [ ${#saltgrain[@]} != 0 ]; then
                 componentvalues=(${saltgrain[@]})
-		#append components and apply uniq
         fi
 
 	for y in ${componentvalues[@]};
@@ -865,6 +942,14 @@ parseArrays () {
 				string=$(printf '%s, ' "${Cfg[@]}"| cut -d "," -f 1-${#Cfg[@]})
 			fi
 		;;
+		jct)
+                        if [ "${#Jct[@]}" = "0" ]; then
+                                string="<none>"
+                        else
+                                string=$(printf '%s, ' "${Jct[@]}"| cut -d "," -f 1-${#Jct[@]})
+                        fi
+                ;;
+
 	esac
 	echo $string
 }
@@ -875,10 +960,11 @@ function componentSummary () {
 	printf '%s' "Hosts : "
 	printf '%s, ' "${targethostloopvalues[@]}"| cut -d "," -f 1-${#targethostloopvalues[@]}
 	printf '%s \n' "====================================================="
-	printf '%s %s\n' "Commands  :" "$(parseArrays cmd)"
-	printf '%s %s\n' "Logs      :" "$(parseArrays log)"
-	printf '%s %s\n' "Services  :" "$(parseArrays svc)"
-	printf '%s %s\n' "Configs   :" "$(parseArrays cfg)"
+	printf '%s %s\n' "Commands    :" "$(parseArrays cmd)"
+	printf '%s %s\n' "Log Files   :" "$(parseArrays log)"
+	printf '%s %s\n' "Journalctl  :" "$(parseArrays jct)"
+	printf '%s %s\n' "Services    :" "$(parseArrays svc)"
+	printf '%s %s\n' "Configs     :" "$(parseArrays cfg)"
 	printf '%s \n' "-----------------------------------------------------"
 	echo ""
 	if [ ! $noconfirm ]; then
