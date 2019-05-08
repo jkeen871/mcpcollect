@@ -29,10 +29,6 @@ files, logs, and run a set of commands to collect statistics or information abou
           The MCP host name of the systems you want to collect information from
 			* Multiple host selections are supported (-h host1 -h host2)
 
-    -l -- Run on your localhost with ssh access to a Cfg or Salt node.  This option also requires the -s switch
-			
-			be prompted many times for your ssh password
-
     -p -- Preview only --Do not collect any files, previews what will be collected for each grain
 
     -s -- <cfg node or salt node>
