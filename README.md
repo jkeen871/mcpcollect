@@ -30,13 +30,16 @@ files, logs, and run a set of commands to collect statistics or information abou
 			* Multiple host selections are supported (-h host1 -h host2)
 
     -l -- Run on your localhost with ssh access to a Cfg or Salt node.  This option also requires the -s switch
-			* Note this requires ssh keys to be installed from your local host to the cfg node, or you will 
+			
 			be prompted many times for your ssh password
 
     -p -- Preview only --Do not collect any files, previews what will be collected for each grain
 
     -s -- <cfg node or salt node>
-			* REQUIRED : hostname or IP of the salt of config host.
+    		 Run on your localhost with ssh access to a Cfg or Salt node. 
+	 			* REQUIRED : hostname or IP of the salt of config host.
+	 			* Note this requires ssh keys to be installed from your  local host to the cfg node, 
+	 			or you will be prompted many times for your ssh password.
 
     -y -- Autoconfirm -- Do not print confirmation and summary prompt
 
