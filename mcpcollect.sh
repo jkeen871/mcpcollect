@@ -142,10 +142,10 @@ function usage {
         echo "          The MCP host name of the systems you want to collect information from"
         echo "		* Multiple host selections are supported (-h host1 -h host2)"
         echo ""
-        echo "    -l -- Run on your localhost with ssh access to a Cfg or Salt node.  This option also requires the -s switch"
-	echo "		* Note this requires ssh keys to be installed from your local host to the cfg node, or you will be prompted"
-	echo "		  many times for your ssh password"
-        echo ""
+#       echo "    -l -- Run on your localhost with ssh access to a Cfg or Salt node.  This option also requires the -s switch"
+#echo "		* Note this requires ssh keys to be installed from your local host to the cfg node, or you will be prompted"
+#echo "		  many times for your ssh password"
+#       echo ""
         echo "    -p -- Preview only --Do not collect any files, previews what will be collected for each grain"
         echo ""
         echo "    -s -- <cfg node or salt node>"
@@ -163,16 +163,16 @@ function usage {
 #                c) componentFlag=true; componentvalues+=("$OPTARG");;
 
 
-while getopts "c:h:g::s:layp" arg; do
+while getopts "c:h:g::s:ayp" arg; do
         case $arg in
                 h) targetHostFlag=true;targethostvalues+=("$OPTARG");;
-                s) confighostFlag=true;confighost="$OPTARG";;
+                s) confighostFlag=true;runlocalFlag=true;confighost="$OPTARG";;
                 a) alllogsFlag=true;;
                 g) saltgrainsFlag=true;saltgrain+=("$OPTARG");;
                 y) skipconfirmationFlag=true;;
                 p) previewFlag=true;;
 		q) queryflag=true;;
-		l) runlocalFlag=true;;
+#		l) runlocalFlag=true;;
 		*) usage;;
                 \?) usage;;
         esac
@@ -182,11 +182,11 @@ if [ $OPTIND -eq 1 ]; then usage ; fi
 
 
 datestamp=`date '+%Y%m%d%H%M%S'`
-localbasedir="/tmp/mcpcollect"
+localbasedir="/tmp/mcpcollect-$USER"
 localtargetdir="$localbasedir/$confighost/$datestamp"
 keystonercv3="/root/keystonercv3"
 keystonercv2="/root/keystonerc"
-remotebasedir="/tmp/mcpcollect"
+remotebasedir="/tmp/mcpcollect-$USER"
 remotetargetdir="$remotebasedir/$datestamp"
 green='\e[1;92m'
 nocolor='\033[0m'
