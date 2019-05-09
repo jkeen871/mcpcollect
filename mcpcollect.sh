@@ -528,6 +528,42 @@ function abort {
 	exit
 }
 
+
+function veryfysshToCfg {
+	confighost=$1
+	echo "Verfiying SSH connectivity to $confighost"
+
+	sshResult=$(ssh -q -o 'BatchMode=yes' $confighost  'echo 2>&1' && echo SSH_OK || echo SSH_NOK |tail -1) 
+        if [[ "$sshResult" == *"SSH_OK"* ]];then
+                echo "SSH connectivity verified"
+        else
+                abortmessage+="Cannot connect to host $confighost via SSH"
+                abort
+        fi
+	echo "   complete."
+
+
+}
+function verifySshToTarget {
+	host=$1
+	echo "Verifying ssh connectivity to $host"
+	sshCheckConnectivity="ssh -q -o 'BatchMode=yes' $host  'echo 2>&1' && echo $host SSH_OK || echo $host SSH_NOK |tail -1"
+	if [ $runlocalFlag ]; then
+		sshResult=$(ssh -q -oStrictHostKeyChecking=no $confighost $sshCheckConnectivity)
+        else
+		sshResult=$(eval $sshCheckConnectivity)
+        fi
+        echo "   complete."
+
+	if [[ "$sshResult" == *"SSH_OK"* ]];then
+		echo "SSH connectivity verified"
+	else
+		abortmessage+="Cannot connect to host $targethost ($targethostIP) via SSH"
+		abort
+	fi
+	complete
+}
+
 function collectJournalCtl {
 	journalCommand="mkdir -p $remotetargetdir/var/log;cd $remotetargetdir/var/log;"
 	lenJct=${#Jct[@]}
@@ -560,7 +596,7 @@ function collectFiles {
 	elif [ "$collectType" = "all" ]; then
 		sourceFile=("`echo ${Cfg[@]} ${Log[@]}`")
 	fi
-	sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethostip':'$remotetargetdir'/'$tarname' '$localdestdir'/'
+	sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethostIP':'$remotetargetdir'/'$tarname' '$localdestdir'/'
 
 	if [ "${#sourceFile[@]}" > 0  ]; then
 		if [ $runlocalFlag ]; then
@@ -595,7 +631,7 @@ function cleanCfgHost {
 function transferResultsCfg {
 	echo "Transferring results from $targethost to $confighost,$component..."
 	localdestdir="$remotetargetdir/$targethost"
-	sshXferResultsCfg='mkdir -p '$localdestdir';scp -o StrictHostKeyChecking=no -r '$targethostip':'$remotetargetdir'/* '$localdestdir
+	sshXferResultsCfg='mkdir -p '$localdestdir';scp -o StrictHostKeyChecking=no -r '$targethostIP':'$remotetargetdir'/* '$localdestdir
 	if [ $runlocalFlag ]; then
 		ssh -q -oStrictHostKeyChecking=no $confighost $sshXferResultsCfg
 	else
@@ -609,13 +645,14 @@ function getIpAddrFromSalt {
 	host=$1
 	echo "Getting IP address for $host from reclass..."
 	sshgetipaddress="for x in \$(sudo salt '"*$host*"' network.ip_addrs|grep '-' | awk -F' - ' '{print \$2}' | sed 's/ //g');do ping -c1 \$x 2>&1 >/dev/null; if [ \$? = 0 ];  then echo \$x ;break;fi; done"
-	targethostip=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
-	echo "   complete"
+#	targethostIP=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
 	if [ $runlocalFlag ]; then
-		targethostip=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
+		targethostIP=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
  	else	
-		targethostip=$(eval $sshgetipaddress)
+		targethostIP=$(eval $sshgetipaddress)
 	fi
+	echo "$host $targethostIP"
+	echo "   Complete."
 }
 
 function collectReclass {
@@ -822,12 +859,6 @@ function collect {
 
 function main {
 	
-# assignArrays "$component"
-#        scrubArrays
-#        journalstring=$(printf '%s > %s/%s'"${Log[@]}" "$remotetargetdir" "somelog.zip" | cut -d ";" -f 1-${#Log[@]})
-#        echo $journalstring
-#        exit
-
 	targethostloopvalues=(${targethostvalues[@]});
 
 	if [ "$confighost" != "" ]; then
@@ -837,14 +868,13 @@ function main {
 		fi
 	fi
 
-	if [ ! $confighostFlag ] && [ $runlocalFlag ];  then
-		echo " USAGE ERROR  -s is a required switch"
-		usage
-	fi
-
         if [ ${#componentvalues[@]} = 0 ] && [ ${#saltgrain[@]} != 0 ]; then
                 componentvalues=(${saltgrain[@]})
         fi
+
+	if [ $runlocalFlag ]; then
+		veryfysshToCfg $confighost
+	fi
 
 	for y in ${componentvalues[@]};
         do
@@ -874,6 +904,7 @@ function main {
 		assignArrays "$component"
 		scrubArrays
 		logWildCards
+		
 		componentSummary
 		for x in ${targethostloopvalues[@]}; 
 		do
@@ -887,6 +918,7 @@ function main {
 				if [ "$targethostIP" = "" ]; then
 					getIpAddrFromSalt $targethost
 				fi
+				verifySshToTarget $targethostIP
 				collect $targethost $component 
 			fi
 			
