@@ -915,9 +915,7 @@ function main {
 			scrubArrays
                 	logWildCards
 			if [ ! $previewFlag ]; then
-				if [ "$targethostIP" = "" ]; then
-					getIpAddrFromSalt $targethost
-				fi
+				getIpAddrFromSalt $targethost
 				verifySshToTarget $targethostIP
 				collect $targethost $component 
 			fi
