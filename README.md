@@ -73,22 +73,22 @@ files, logs, and run a set of commands to collect statistics or information abou
 
     ├── ctl01  
     │   ├── ctl01-controller-files-20190510202534.tar.gz  
-    │   ├── output
-    │   │   ├── ctl01-cinder.controller-cmd
-    │   │   └── ctl01-cinder.controller-svc
-    │   └── reclass-.tar.gz
-    ├── ctl02
-    │   ├── ctl02-cinder.controller-files-20190510202534.tar.gz
-    │   ├── output
-    │   │   ├── ctl02-cinder.controller-cmd
-    │   │   └── ctl02-cinder.controller-svc
-    │   └── reclass-.tar.gz
-    └── ctl03
-        ├── ctl03-cinder.controller-files-20190510202534.tar.gz
-        ├── output
-        │   ├── ctl03-cinder.controller-cmd
-        │   └── ctl03-cinder.controller-svc
-        └── reclass-.tar.gz
+    │   ├── output  
+    │   │   ├── ctl01-cinder.controller-cmd  
+    │   │   └── ctl01-cinder.controller-svc  
+    │   └── reclass-.tar.gz  
+    ├── ctl02  
+    │   ├── ctl02-cinder.controller-files-20190510202534.tar.gz  
+    │   ├── output  
+    │   │   ├── ctl02-cinder.controller-cmd  
+    │   │   └── ctl02-cinder.controller-svc  
+    │   └── reclass-.tar.gz  
+    └── ctl03  
+        ├── ctl03-cinder.controller-files-20190510202534.tar.gz  
+        ├── output  
+        │   ├── ctl03-cinder.controller-cmd  
+        │   └── ctl03-cinder.controller-svc  
+        └── reclass-.tar.gz  
         
 A directory will be created for each host collected.
 
