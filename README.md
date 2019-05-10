@@ -71,8 +71,8 @@ files, logs, and run a set of commands to collect statistics or information abou
 
 5) Once the script completes, Change directories to the path specified as by the script. /tmp/mcpcollect-yourusername/
 
-    ├── ctl01
-    │   ├── ctl01-controller-files-20190510202534.tar.gz
+    ├── ctl01  
+    │   ├── ctl01-controller-files-20190510202534.tar.gz  
     │   ├── output
     │   │   ├── ctl01-cinder.controller-cmd
     │   │   └── ctl01-cinder.controller-svc
