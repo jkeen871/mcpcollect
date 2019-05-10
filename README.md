@@ -57,7 +57,7 @@ files, logs, and run a set of commands to collect statistics or information abou
   The output will be written to /tmp/mcpcollect-username/
   
     Summary for component : cinder.controller
-    Output  : /tmp/mcpcollect-yourusername//20190510202534**
+    Output  : /tmp/mcpcollect-yourusername/20190510202534
     Hosts : ctl01, ctl03, ctl02
     ===================================================== 
     Commands    : uname -a, df -h, mount, du -h --max-depth=1 /, lsblk, free -h, ifconfig, ps au --sort=-rss, salt-call pkg.list_pkgs versions_as_list=True, ntpq -p, cinder list
