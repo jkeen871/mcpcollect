@@ -533,7 +533,7 @@ function veryfysshToCfg {
 	confighost=$1
 	echo "Verfiying SSH connectivity to $confighost"
 
-	sshResult=$(ssh -q -o 'BatchMode=yes' $confighost  'echo 2>&1' && echo SSH_OK || echo SSH_NOK |tail -1) 
+	sshResult=$(ssh -q -o 'BatchMode=yes' -o 'StrictHostKeyChecking=no' $confighost  'echo 2>&1' && echo SSH_OK || echo SSH_NOK |tail -1) 
         if [[ "$sshResult" == *"SSH_OK"* ]];then
                 echo "SSH connectivity verified"
         else
