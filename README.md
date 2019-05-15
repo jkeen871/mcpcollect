@@ -15,7 +15,7 @@ files, logs, and run a set of commands to collect statistics or information abou
 
 **Usage**
 
-    mcpcollector -g <some.grain> -h <somehost> -h <anotherhost> 
+    mcpcollector -g <some.grain> -g <some.grain> -h <somehost> -h <anotherhost> 
 
     -a -- All logs -- Collect all logs from the specified log directory.
           The default is to only collect *.log files, setting this switch will collect
@@ -24,8 +24,13 @@ files, logs, and run a set of commands to collect statistics or information abou
           /var/log and could potentially consume too much disk on certain nodes
 
     -g -- <salt grain>
-          Specify the salt grain name (ceph.mon, ceph.common) to collect information from
-          Hosts from grain are superceeded by host provided in -h
+           Name of  salt.grain(s) to collect.  Multiple grains may be provided with additional -g switch.
+		   Acceptable grains are :
+
+           ceph.mon,ceph.osd,ceph.radosgw,cinder.controller,cinder.volume,docker.swarm,haproxy.proxy,
+           horizon.server,keystone.client,keystone.server,neutron.server,nova.compute,nova.controller,
+           ntp.client,opencontrail.client,opencontrail.collector,opencontrail.control,opencontrail.database,
+           opencontrail.web,rabbitmq.cluster|rabbitmq.server
 
     -h -- <target hostname or IP>
           The MCP host name of the systems you want to collect information from 

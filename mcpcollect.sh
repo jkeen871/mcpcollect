@@ -135,8 +135,13 @@ function usage {
         echo "          /var/log and could potentially consume too much disk on certain nodes"
         echo ""
         echo "    -g -- <salt grain>"
-        echo "          Specify the salt grain name (ceph.mon, ceph.common) to collect information from"
-        echo "          Hosts from grain are superceeded by host provided in -h"
+	echo "          Name of  salt.grain(s) to collect.  Multiple grains may be provided with additional -g switch."
+        echo "  	Acceptable grains are :"
+	echo ""
+        echo "          ceph.mon,ceph.osd,ceph.radosgw,cinder.controller,cinder.volume,docker.swarm,haproxy.proxy,"
+	echo "          horizon.server,keystone.client,keystone.server,neutron.server,nova.compute,nova.controller,"
+	echo "          ntp.client,opencontrail.client,opencontrail.collector,opencontrail.control,opencontrail.database,"
+	echo "          opencontrail.web,rabbitmq.cluster,rabbitmq.server"
         echo ""
         echo "    -h -- <target hostname or IP>"
         echo "          The MCP host name of the systems you want to collect information from"
@@ -163,7 +168,7 @@ function usage {
 
 #                c) componentFlag=true; componentvalues+=("$OPTARG");;
 
-
+ipmiFlag=false
 while getopts "i:c:h:g::s:ayp" arg; do
         case $arg in
                 h) targetHostFlag=true;targethostvalues+=("$OPTARG");;
@@ -173,7 +178,7 @@ while getopts "i:c:h:g::s:ayp" arg; do
                 y) skipconfirmationFlag=true;;
                 p) previewFlag=true;;
 		q) queryflag=true;;
-		i) ipmiflag=true;IPMI=$OPTARG;;
+		i) ipmiFlag=true;IPMI=$OPTARG;;
 #		l) runlocalFlag=true;;
 		*) usage;;
                 \?) usage;;
@@ -922,7 +927,7 @@ function collect {
 			if [ impiFlag ]; then
 				case $IPMI in
 				dell ) 
-					idracDell2 $targethost
+					idracDell $targethost
 				;;
 				esac				
 			fi
@@ -1011,7 +1016,7 @@ function main {
 
 }
 
-function idracDell2 () {
+function idracDell () {
 	targetIdrac=$(echo $1 | awk -F'.' '{print $1}')
 	sshOptions="-q -o StrictHostKeyChecking=no"
 	getdracip="sudo salt-call pillar.data maas:region:machines:$targetIdrac:power_parameters:power_address 2> /dev/null | tail -1 | sed 's/ //g'"
@@ -1131,6 +1136,7 @@ function componentSummary () {
 	printf 'Summary for component : %s\nOutput  : %s\n' "$component" "$localtargetdir"
 	printf '%s' "Hosts : "
 	printf '%s, ' "${targethostloopvalues[@]}"| cut -d "," -f 1-${#targethostloopvalues[@]}
+	printf 'Collect IPMI : %s\n'  "$ipmiFlag"
 	printf '%s \n' "====================================================="
 	printf '%s %s\n' "Commands    :" "$(parseArrays cmd)"
 	printf '%s %s\n' "Log Files   :" "$(parseArrays log)"
