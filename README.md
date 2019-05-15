@@ -28,8 +28,10 @@ files, logs, and run a set of commands to collect statistics or information abou
           Hosts from grain are superceeded by host provided in -h
 
     -h -- <target hostname or IP>
-          The MCP host name of the systems you want to collect information from
-			* Multiple host selections are supported (-h host1 -h host2)
+          The MCP host name of the systems you want to collect information from 
+          	* Multiple host selections are supported (-h host1 -h host2)
+
+    -i -- Collect IPMI logs.  Queries reclass to locate IPMI login information and connects to pull information.   Acceptable values are : dell.
 
     -p -- Preview only --Do not collect any files, previews what will be collected for each grain
 

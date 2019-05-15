@@ -142,7 +142,9 @@ function usage {
         echo "          The MCP host name of the systems you want to collect information from"
         echo "		* Multiple host selections are supported (-h host1 -h host2)"
         echo ""
-        echo "    -p -- Preview only --Do not collect any files, previews what will be collected for each grain"
+	echo "    -i -- Collect IPMI logs.  Acceptable values are : dell"
+	echo ""
+	echo "    -p -- Preview only --Do not collect any files, previews what will be collected for each grain"
         echo ""
         echo "    -s -- <cfg node or salt node>"
 	echo "          Run from your localhost with ssh access to a Cfg or Salt node."
@@ -162,7 +164,7 @@ function usage {
 #                c) componentFlag=true; componentvalues+=("$OPTARG");;
 
 
-while getopts "c:h:g::s:ayp" arg; do
+while getopts "i:c:h:g::s:ayp" arg; do
         case $arg in
                 h) targetHostFlag=true;targethostvalues+=("$OPTARG");;
                 s) confighostFlag=true;runlocalFlag=true;confighost="$OPTARG";;
@@ -171,6 +173,7 @@ while getopts "c:h:g::s:ayp" arg; do
                 y) skipconfirmationFlag=true;;
                 p) previewFlag=true;;
 		q) queryflag=true;;
+		i) ipmiflag=true;IPMI=$OPTARG;;
 #		l) runlocalFlag=true;;
 		*) usage;;
                 \?) usage;;
@@ -195,6 +198,14 @@ function assignArrays {
 	component=$1
 
 	### For empty arrays, i.e.: no commands in the cmd array, do not put an empty space ("") leave the array empty.   For example use : cmd=(), Do not use cmd=("").
+
+	declare -g dellIpmi=(   \
+                        "racadm getsvctag" \
+                        "racadm getsel" \
+                        "racadm getraclog -c100" \
+                        "racadm getsensorinfo" \
+                        "racadm hwinventory" \
+                   )
 
 	declare -g generalCmd=(		"uname -a"\
 					"df -h" \
@@ -302,6 +313,74 @@ function assignArrays {
 			declare -g Cmd=(        "cinder list" \
 					)
 		;;
+		opencontrail.control)
+                        declare -g Log=(        "/var/log/contrail/"                         \
+                                        )
+                        declare -g Cfg=(        "/etc/contrail/"                                 \
+                                        )
+                        declare -g Svc=(        "contrail-api"                        \
+						"contrail-control" \
+						"contrail-device-manager"\
+						"contrail-discovery" \
+						"contrail-dns" \
+						"contrail-named" \
+						"contrail-schema" \
+						"contrail-svc-monitor"\
+                                        )
+                        declare -g Cmd=(        "contrail-status" \
+                                        )
+                ;;
+		opencontrail.collector)
+			declare -g Log=(        "/var/log/contrail/"                         \
+                                        )
+                        declare -g Cfg=(        "/etc/contrail/"                                 \
+                                        )
+                        declare -g Svc=(        "contrail-alarm-gen"\
+						"contrail-analytics-api"\
+						"contrail-collector"\
+						"contrail-query-engine"\
+						"contrail-snmp-collector"\
+						"contrail-topology"			\
+                                        )
+                        declare -g Cmd=(        "contrail-status" \
+					)
+		;;
+		opencontrail.client) 
+			declare -g Log=(        "/var/log/contrail/"                         \
+                                                "/var/log/contrail.log"\
+                                        )
+                        declare -g Cfg=(        "/etc/contrail/"                                 \
+                                        )
+                        declare -g Svc=(        "contrail-vrouter-agent"                        \
+                                        )
+                        declare -g Cmd=(        "contrail-status" \
+					)
+                ;;
+		opencontrail.database)
+                        declare -g Log=(        "/var/log/contrail/"                         \
+                                                "/var/log/contrail.log"\
+                                        )
+                        declare -g Cfg=(        "/etc/contrail/"                                 \
+                                        )
+                        declare -g Svc=(        "contrail-database"\
+                                                "contrail-database-nodemgr"\
+
+                                        )
+                        declare -g Cmd=(        "contrail-status" \
+					)
+		;;
+		opencontrail.web)
+                        declare -g Log=(        "/var/log/contrail/"                         \
+                                        )
+                        declare -g Cfg=(        "/etc/contrail/"                                 \
+                                        )
+                        declare -g Svc=(       "contrail-webui" \
+                                               "contrail-webui-middleware"\
+
+                                        )
+                        declare -g Cmd=(        "contrail-status" \
+					)
+                ;;
 		docker.swarm)
 			declare -g Log=(        "/var/log/docker/"           \
 					)
@@ -452,7 +531,7 @@ function assignArrays {
 					)
 		;;
 
-		reclass)
+	reclass)
 			### Reclas Model ###
 			declare -a Cmd=("tar -zcvf reclass-$datestamp.tar.gz /var/salt/reclass $targetdir")
 		;;
@@ -547,7 +626,7 @@ function veryfysshToCfg {
 function verifySshToTarget {
 	host=$1
 	echo "Verifying ssh connectivity to $host"
-	sshCheckConnectivity="ssh -q -o 'BatchMode=yes' $host  'echo 2>&1' && echo $host SSH_OK || echo $host SSH_NOK |tail -1"
+	sshCheckConnectivity="ssh -q -o 'BatchMode=yes' -o 'StrictHostKeyChecking=no' $host  'echo 2>&1' && echo $host SSH_OK || echo $host SSH_NOK |tail -1"
 	if [ $runlocalFlag ]; then
 		sshResult=$(ssh -q -oStrictHostKeyChecking=no $confighost $sshCheckConnectivity)
         else
@@ -644,7 +723,7 @@ function transferResultsCfg {
 function getIpAddrFromSalt {
 	host=$1
 	echo "Getting IP address for $host from reclass..."
-	sshgetipaddress="for x in \$(sudo salt '"*$host*"' network.ip_addrs|grep '-' | awk -F' - ' '{print \$2}' | sed 's/ //g');do ping -c1 \$x 2>&1 >/dev/null; if [ \$? = 0 ];  then echo \$x ;break;fi; done"
+	sshgetipaddress="for x in \$(sudo salt -t5 '"*$host*"' network.ip_addrs|grep '-' | awk -F' - ' '{print \$2}' | sed 's/ //g');do ping -c1 \$x 2>&1 >/dev/null; if [ \$? = 0 ];  then echo \$x ;break;fi; done"
 #	targethostIP=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
 	if [ $runlocalFlag ]; then
 		targethostIP=(`ssh -q -o StrictHostKeyChecking=no $confighost $sshgetipaddress`)
@@ -784,7 +863,7 @@ function scrubArrays {
 
 function getTargetHostByGrains() {
 	grain=$1
-	sshGetHostByGrains="sudo salt --out txt  '*' grains.item roles  | grep '$grain' | awk -F':' '{printf \$1 \" \" }'"
+	sshGetHostByGrains="sudo salt -t5 --out txt  '*' grains.item roles  | grep '$grain' | awk -F':' '{printf \$1 \" \" }'"
 	if [ $runlocalFlag ]; then
 		result=$(ssh -q $confighost $sshGetHostByGrains)
 	else
@@ -840,11 +919,17 @@ function collect {
                         echo "==========================================================="
 			executeRemoteCommands "cmd"
                         executeRemoteCommands "svc"
+			if [ impiFlag ]; then
+				case $IPMI in
+				dell ) 
+					idracDell2 $targethost
+				;;
+				esac				
+			fi
                         collectFiles "all"
 			collectJournalCtl
                         transferResultsCfg
 			cleanTargethost
-			collectReclass
 			if [ $runlocalFlag ]; then
 	                        transferResultsLocal
         	                cleanCfgHost	
@@ -908,7 +993,7 @@ function main {
 		componentSummary
 		for x in ${targethostloopvalues[@]}; 
 		do
-
+			
 			targethost=$x
 			component="$y"
 			assignArrays "$component"
@@ -923,6 +1008,64 @@ function main {
 
 		done
 	done
+
+}
+
+function idracDell2 () {
+	targetIdrac=$(echo $1 | awk -F'.' '{print $1}')
+	sshOptions="-q -o StrictHostKeyChecking=no"
+	getdracip="sudo salt-call pillar.data maas:region:machines:$targetIdrac:power_parameters:power_address 2> /dev/null | tail -1 | sed 's/ //g'"
+        getdracpw="sudo salt-call pillar.data maas:region:machines:$targetIdrac:power_parameters:power_password 2> /dev/null | tail -1| sed 's/ //g'"
+        getdracid="sudo salt-call pillar.data maas:region:machines:$targetIdrac:power_parameters:power_user 2> /dev/null| tail -1|sed 's/ //g'"
+        sshSaltTest="sudo salt-call pillar.data maas:region:machines:$targetIdrac 2>/dev/null| tail -1"
+	if [ $runlocalFlag ]; then
+                salttest=`ssh $sshOptions $confighost $sshSaltTest`
+        else
+		salttest=$(eval $shSaltTest)
+        fi
+	echo $salttest
+        if [[ $salttest =~ .*$targetIdrac.* ]]; then
+                echo "$targetIdrac is a virtual system, there is no iDRAC"
+		return
+        else
+                echo "Collecting IPMI from salt..."
+		if [ $runlocalFlag ]; then
+	                dracip=`ssh $sshOptions $confighost $getdracip`
+			dracpw=`ssh $sshOptions $confighost $getdracpw`
+			dracid=`ssh $sshOptions $confighost $getdracid`
+			
+		else
+			dracip=$(eval $getdracip)
+			dracpw=$(eval $getdracpw)
+			dracid=$(eval $getdracid)
+		fi
+	        echo "Verifying iDRAC version..."
+		getdracver="sshpass -p $dracpw ssh $sshOptions $dracid@$dracip 'racadm getversion' | grep 'iDRAC Version'| awk '{print \$1}'"
+		if [ $runlocalFlag ]; then
+			
+	                dracver=`ssh $sshOptions $confighost $getdracver`
+			echo "$dracver"
+		else 
+			dracver=$(eval $getdracver)
+		fi
+                if [[ "$dracver" == *"iDRAC"* ]]; then
+                        mkdir -p $localbasedir 2> /dev/null
+                        for ipmicmd in "${dellIpmi[@]}";
+                        do
+                                getIpmi='mkdir -p '$localdestdir'/idrac/;echo -e "\n@@@========='$ipmicmd'=====\n">> '$localdestdir'/idrac/'$targetIdrac'.log;sshpass -p '$dracpw' ssh '$sshOptions' '$dracid@$dracip' "'$ipmicmd'" 2>/dev/null >> '$localdestdir'/idrac/'$targetIdrac'.log'
+					echo "Collecting : $ipmicmd"
+					if [ $runlocalFlag ]; then
+	                                        ssh $sshOptions $confighost $getIpmi
+					else
+						eval $getIpmi
+					fi 
+                        done
+
+                 else
+                        echo "Could not verify Dell iDrac"
+                 fi
+        fi
+
 
 }
 
