@@ -353,6 +353,7 @@ function assignArrays {
 		opencontrail.client) 
 			declare -g Log=(        "/var/log/contrail/"                         \
                                                 "/var/log/contrail.log"\
+						"/var/log/crashes/"
                                         )
                         declare -g Cfg=(        "/etc/contrail/"                                 \
                                         )
