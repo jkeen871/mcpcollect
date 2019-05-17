@@ -214,6 +214,7 @@ function assignArrays {
 
 	declare -g generalCmd=(		"uname -a"\
 					"df -h" \
+					"journalctl --list-boots --no-page"\
 					"mount" \
 					"du -h --max-depth=1 /" \
 					"lsblk" \
@@ -222,10 +223,12 @@ function assignArrays {
 					"ps au --sort=-rss"\
 					"salt-call pkg.list_pkgs versions_as_list=True" \
 					"ntpq -p"\
+					"reclass-salt --top"\
 				)
 	declare -g generalCfg=(		"/etc/hosts"\
 				)
 	declare -g generalLog=(		"/var/log/syslog" \
+					"/var/log/kern.log" \
 				)
 	declare -g generalSvc=()
 
@@ -315,7 +318,8 @@ function assignArrays {
 			declare -g Svc=(        "cinder-scheduler"                     \
 						"cinder-volume"                        \
 					)
-			declare -g Cmd=(        "cinder list" \
+			declare -g Cmd=(        "cinder list" 
+						"haproxy-status"\
 					)
 		;;
 		opencontrail.control)
@@ -333,6 +337,7 @@ function assignArrays {
 						"contrail-svc-monitor"\
                                         )
                         declare -g Cmd=(        "contrail-status" \
+						"haproxy-status" \
                                         )
                 ;;
 		opencontrail.collector)
@@ -473,7 +478,9 @@ function assignArrays {
 					)
 			declare -g Svc=(        "neutron-openvswitch-agent"            \
 					)
-			declare -g Cmd=(        "neutron agent-list"                            \
+			declare -g Cmd=(        "neutron agent-list"        \
+						"neutron port-list" \
+						"neutron security-group-rule-list"\
 					)
 		;;
 		ntp.client)
@@ -509,6 +516,7 @@ function assignArrays {
 			declare -g Cmd=(        "nova hypervisor-list"                          \
 						"nova list --fields name,networks,host --all-tenants" \
 						"nova service-list"\
+						"haproxy-status" \
 					)
 			declare -g Log=(        "/var/log/nova/"                           \
 											       \
@@ -542,8 +550,8 @@ function assignArrays {
 			declare -a Cmd=("tar -zcvf reclass-$datestamp.tar.gz /var/salt/reclass $targetdir")
 		;;
 		telegraf.agent )
-                        declare -g Jct=(        "journalctl -x -u telegraf --no-page"                \
-						"journalctl -x -u otherone --no-page" \
+                        declare -g Jct=(        "journalctl -x -u telegraf --no-page --since '3 days ago'"                \
+						"journalctl -x -u otherone --no-page --since '3 days ago'" \
 					)
 			declare -g Log=()
                         declare -g Cfg=(        "/etc/telegraf"			\
