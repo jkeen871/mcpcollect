@@ -126,7 +126,7 @@
 
 function usage {
         echo ""
-	echo "    mcpcollector -s <mmo-somehost> -g ceph.osd -h osd001 -h osd002 -y -l"
+	echo "    mcpcollector -s <mmo-somehost> -g ceph.osd -h osd001 -h osd002"
         echo ""
         echo "    -a -- All logs -- Collect all logs from the specified log directory."
         echo "          The default is to only collect *.log files, setting this switch will collect"
@@ -151,12 +151,6 @@ function usage {
 	echo ""
 	echo "    -p -- Preview only --Do not collect any files, previews what will be collected for each grain"
         echo ""
-        echo "    -s -- <cfg node or salt node>"
-	echo "          Run from your localhost with ssh access to a Cfg or Salt node."
-	echo "          * Note this requires ssh keys to be installed from your local host to the cfg node, or you will be prompted"
-	echo "            many times for your ssh password."
-        echo "          * REQUIRED : hostname or IP of the salt of config host."
-        echo ""
         echo "    -y -- Autoconfirm -- Do not print confirmation and summary prompt"
 	echo ""
 	echo "For questions or suggeststions contact Jerry Keen, jkeen@mirantis.com."
@@ -179,7 +173,6 @@ while getopts "i:c:h:g::s:ayp" arg; do
                 p) previewFlag=true;;
 		q) queryflag=true;;
 		i) ipmiFlag=true;IPMI=$OPTARG;;
-#		l) runlocalFlag=true;;
 		*) usage;;
                 \?) usage;;
         esac
@@ -549,11 +542,6 @@ function assignArrays {
 						"rabbitmqctl list_queues -p /openstack messages consumers name" \
 						"rabbitmqctl eval 'rabbit_diagnostics:maybe_stuck().'" \
 					)
-		;;
-
-	reclass)
-			### Reclas Model ###
-			declare -a Cmd=("tar --ignore-failed-read -zcvf reclass-$datestamp.tar.gz /var/salt/reclass $targetdir")
 		;;
 		telegraf.agent )
                         declare -g Jct=(        "journalctl -x -u telegraf --no-page --since '3 days ago'"                \
