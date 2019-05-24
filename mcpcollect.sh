@@ -221,6 +221,8 @@ function assignArrays {
 					"ifconfig"\
 					"ps au --sort=-rss"\
 					"salt-call pkg.list_pkgs versions_as_list=True" \
+					"dmidecode" \
+					"lsmod" \
 					"ntpq -p"\
 					"reclass-salt --top"\
 				)
