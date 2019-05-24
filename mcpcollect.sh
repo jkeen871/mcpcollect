@@ -195,13 +195,19 @@ keystonercv3="/root/keystonercv3"
 keystonercv2="/root/keystonerc"
 remotebasedir="/tmp/mcpcollect-$USER"
 remotetargetdir="$remotebasedir/$datestamp"
-green='\e[1;92m'
-nocolor='\033[0m'
-red='\e[1;31m'
+green=$(tput setaf 2)
+yellow=$(tput setaf 3)
+nocolor=$(tput sgr0)
+red=$(tput setaf 1)
+
 
 function assignArrays {
 	component=$1
-
+	unset Log
+	unset Svc
+	unset Cfg
+	unset Jct
+	unset Cmd
 	### For empty arrays, i.e.: no commands in the cmd array, do not put an empty space ("") leave the array empty.   For example use : cmd=(), Do not use cmd=("").
 
 	declare -g dellIpmi=(   \
@@ -213,8 +219,8 @@ function assignArrays {
                    )
 
 	declare -g generalCmd=(		"uname -a"\
-					"df -h" \
 					"journalctl --list-boots --no-page"\
+					"df -h" \
 					"mount" \
 					"du -h --max-depth=1 /" \
 					"lsblk" \
@@ -547,7 +553,7 @@ function assignArrays {
 
 	reclass)
 			### Reclas Model ###
-			declare -a Cmd=("tar -zcvf reclass-$datestamp.tar.gz /var/salt/reclass $targetdir")
+			declare -a Cmd=("tar --ignore-failed-read -zcvf reclass-$datestamp.tar.gz /var/salt/reclass $targetdir")
 		;;
 		telegraf.agent )
                         declare -g Jct=(        "journalctl -x -u telegraf --no-page --since '3 days ago'"                \
@@ -571,10 +577,11 @@ function assignArrays {
 	Log=("${generalLog[@]}" "${Log[@]}")
 	Cfg=("${generalCfg[@]}" "${Cfg[@]}")
 	Svc=("${generalSvc[@]}" "${Svc[@]}")
+	Jct=("${generalJct[@]}" "${Jct[@]}")
 }
 
 function abortprompt {
-	read -p " Do you want to continue? [y/n] " -n 1 -r
+	read -p "${yellow}Do you want to continue? [y/n] ${nocolor}" -n 1 -r
 	echo -e "${nocolor}\n"
         if [[ $REPLY =~ ^[Yy]$ ]]
         then
@@ -633,10 +640,34 @@ function veryfysshToCfg {
                 abortmessage+="Cannot connect to host $confighost via SSH"
                 abort
         fi
-	echo "   complete."
-
-
 }
+
+function verifyDiskRequired {
+	echo "Verifying disk space for collection..."
+	sourceFile=("`echo ${Cfg[@]} ${Log[@]}`")
+	sshVerifyDiskCfg="df -h / | grep -v "Filesystem" | awk '{print \$4}'"
+	if [ $runlocalFlag ]; then
+		cfgResult=$(ssh -q -oStrictHostKeyChecking=no $confighost $sshVerifyDiskCfg)
+	else
+		cfgResult=$(eval $sshVerifyDiskCfg)
+	fi
+	for z in ${targethostloopvalues[@]};
+	do
+		host=$z
+		sshVerifyDiskRequired='sudo salt "*'$host'*" cmd.run "tar --ignore-failed-read -czf - '$sourceFile' |  tar --totals -tzf -"'
+	if [ $runlocalFlag ]; then
+		resultVerifyDiskRequired=$(ssh -q -oStrictHostKeyChecking=no $confighost $sshVerifyDiskRequired | grep 'Total bytes read'| awk '{print $4}')
+        else
+		resultVerifyDiskRequired=$(eval $sshVerifyDiskRequired | grep 'Total bytes read'| awk '{print $4}')
+        fi
+	resultTotal=$(($resultTotal + $resultVerifyDiskRequired))
+	resultMB=$(($resultTotal / 1000000))
+	done
+	echo "You will be collecting approximately $resultMB MB of logs from all hosts, and approximately $cfgResult available on your CFG host."
+	echo "${yellow}Would you like to continue?${nocolor}"
+	abortprompt
+}
+
 function verifySshToTarget {
 	host=$1
 	echo "Verifying ssh connectivity to $host"
@@ -646,35 +677,34 @@ function verifySshToTarget {
         else
 		sshResult=$(eval $sshCheckConnectivity)
         fi
-        echo "   complete."
-
 	if [[ "$sshResult" == *"SSH_OK"* ]];then
 		echo "SSH connectivity verified"
 	else
 		abortmessage+="Cannot connect to host $targethost ($targethostIP) via SSH"
 		abort
 	fi
-	complete
+	#complete
 }
 
 function collectJournalCtl {
-	journalCommand="mkdir -p $remotetargetdir/var/log;cd $remotetargetdir/var/log;"
 	lenJct=${#Jct[@]}
-                countJct=1
-                for (( i=0; i<${lenJct}; i++ ));
-                        do
-				journalCommand+=$(echo ${Jct[$i]} | grep -o "\-u.*" | awk -v a="$targethost" -v b="$component" -v c="$datestamp" -v d="$remotetargetdir" -v e="${Jct[$i]}" '{print e"|gzip > "a"-journal-"$2"-"c".log.gz;"}')
-                        done
-			sshJournalCollectFiles='sudo salt "*'$targethost'*" cmd.run "'$journalCommand'"'
+	if [ "${#Jct[@]}" != "0" ]; then
+		echo "Collecting journalctl output"
+		journalCommand="mkdir -p $remotetargetdir/var/log;cd $remotetargetdir/var/log;"
+		lenJct=${#Jct[@]}
+			countJct=1
+			for (( i=0; i<${lenJct}; i++ ));
+				do
+					journalCommand+=$(echo ${Jct[$i]} | grep -o "\-u.*" | awk -v a="$targethost" -v b="$component" -v c="$datestamp" -v d="$remotetargetdir" -v e="${Jct[$i]}" '{print e"|gzip > "a"-journal-"$2"-"c".log.gz;"}')
+				done
+				sshJournalCollectFiles='sudo salt "*'$targethost'*" cmd.run "'$journalCommand'"'
 
-        if [ $runlocalFlag ]; then
-                ssh -q -oStrictHostKeyChecking=no $confighost $sshJournalCollectFiles
-        else
-                eval $sshCollectFiles
-        fi
-        echo "   complete."
-
-
+		if [ $runlocalFlag ]; then
+			ssh -q -oStrictHostKeyChecking=no $confighost $sshJournalCollectFiles > /dev/null 2>&1
+		else
+			eval $sshJournalCollectFiles > /dev/null 2>&1
+		fi
+	fi
 }
 
 function collectFiles {
@@ -689,15 +719,14 @@ function collectFiles {
 	elif [ "$collectType" = "all" ]; then
 		sourceFile=("`echo ${Cfg[@]} ${Log[@]}`")
 	fi
-	sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar czf '$remotetargetdir'/'$tarname' '$sourceFile'";scp -o StrictHostKeyChecking=no -r '$targethostIP':'$remotetargetdir'/'$tarname' '$localdestdir'/'
-
+#sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar --ignore-failed-read -czf '$remotetargetdir'/'$tarname' '$sourceFile' >/dev/null 2>&1" >/dev/null 2>&1 ;scp -o StrictHostKeyChecking=no -r '$targethostIP':'$remotetargetdir'/'$tarname' '$localdestdir'/'
+sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar --ignore-failed-read -czf '$remotetargetdir'/'$tarname' '$sourceFile' >/dev/null 2>&1" >/dev/null 2>&1'
 	if [ "${#sourceFile[@]}" > 0  ]; then
 		if [ $runlocalFlag ]; then
 			ssh -q -oStrictHostKeyChecking=no $confighost $sshCollectFiles
 		else
-			eval $sshCollectFiles
+			eval $sshCollectFiles 
 		fi
-		echo "   complete."
 	else 
 		echo -e "${green} No files defined for collection in $component.${nocolor}\n"
 	fi
@@ -707,18 +736,16 @@ function cleanTargethost {
 	echo "Cleaning temproary files from $targethost,$component..."
 	sshCleanTarget='sudo salt "*'$targethost'*" cmd.run "rm -fR '$remotebasedir'"'
 	if [ $runlocalFlag ]; then
-		ssh -q -oStrictHostKeyChecking=no $confighost $sshCleanTarget
+		ssh -q -oStrictHostKeyChecking=no $confighost $sshCleanTarget > /dev/null 2>&1
 	else
-                eval $sshCleanTarget
+                eval $sshCleanTarget > /dev/null 2>&1
         fi
-	echo "   complete."
 }
 
 function cleanCfgHost {
         echo "Cleaning temporary files from $confighost,$component..."
         sshCleanCfg='rm -fR '$remotebasedir''
         	ssh -q -oStrictHostKeyChecking=no $confighost $sshCleanCfg
-	echo "   complete."
 }
 
 function transferResultsCfg {
@@ -726,11 +753,10 @@ function transferResultsCfg {
 	localdestdir="$remotetargetdir/$targethost"
 	sshXferResultsCfg='mkdir -p '$localdestdir';scp -o StrictHostKeyChecking=no -r '$targethostIP':'$remotetargetdir'/* '$localdestdir
 	if [ $runlocalFlag ]; then
-		ssh -q -oStrictHostKeyChecking=no $confighost $sshXferResultsCfg
+		ssh -q -oStrictHostKeyChecking=no $confighost $sshXferResultsCfg > /dev/null 2>&1
 	else
-		eval $sshXferResultsCfg
+		eval $sshXferResultsCfg > /dev/null 2>&1
 	fi
-	echo "   complete."
 }
 
 
@@ -745,20 +771,18 @@ function getIpAddrFromSalt {
 		targethostIP=$(eval $sshgetipaddress)
 	fi
 	echo "$host $targethostIP"
-	echo "   Complete."
 }
 
 function collectReclass {
 	echo "Collecting the reclass model..."
 	localdestdir="$remotetargetdir/$targethost"
 	tarname="reclass-$confighost.tar.gz"
-	sshCollectReclass="mkdir -p $localdestdir;sudo /bin/tar -czf $localdestdir/$tarname /srv/salt/reclass/; sudo /bin/chown $USER.$USER $localdestdir/$tarname"
+	sshCollectReclass="mkdir -p $localdestdir;sudo /bin/tar --ignore-failed-read -czf $localdestdir/$tarname /srv/salt/reclass/; sudo /bin/chown $USER.$USER $localdestdir/$tarname"
 	if [ $runlocalFlag ]; then
 		ssh -q -o StrictHostKeyChecking=no $confighost $sshCollectReclass
 	else
 		eval $sshCollectReclass
 	fi
-	echo "   complete."
 }
 
 function transferResultsLocal {
@@ -767,9 +791,8 @@ function transferResultsLocal {
 	localdestdir="$localtargetdir/$targethost"
 	mkdir -p $localdestdir
 	tarname="$targethost-$component-$datestamp.tar.gz"
-	ssh -q -o StrictHostKeyChecking=no $confighost "cd $remotetargetdir/$targethost;tar -czf $tarname *"
+	ssh -q -o StrictHostKeyChecking=no $confighost "cd $remotetargetdir/$targethost;tar --ignore-failed-read -czf $tarname * >/dev/null 2>&1"
 	scp -q -o StrictHostKeyChecking=no -r $confighost:$remotetargetdir/$targethost/$tarname $localdestdir/
-	echo "   complete."
 }
 
 function executeRemoteCommands {
@@ -930,7 +953,6 @@ function collect {
 			component=$2
 
 			echo "Collecting results for target host $targethost, $component"
-                        echo "==========================================================="
 			executeRemoteCommands "cmd"
                         executeRemoteCommands "svc"
 			if [ impiFlag ]; then
@@ -959,7 +981,6 @@ function collect {
 function main {
 	
 	targethostloopvalues=(${targethostvalues[@]});
-
 	if [ "$confighost" != "" ]; then
 		if [ ! -d "$localtargetdir" ]; then
 			mkdir -p $localtargetdir
@@ -975,6 +996,17 @@ function main {
 		veryfysshToCfg $confighost
 	fi
 
+	if [ $previewFlag ] || [ $skipconfirmationFlag ] ; then
+                 noconfirm=true
+        fi
+
+	componentSummary
+	if [ $previewFlag ]; then
+		exit
+	fi
+	if [ ! $skipconfirmationFlag ]; then
+		verifyDiskRequired
+	fi
 	for y in ${componentvalues[@]};
         do
 		component=$y
@@ -982,29 +1014,9 @@ function main {
 			hostsAssociatedWithSaltGrain "$component"
 		fi
 
-		if [ ${#infomessage[@]} != 0 ]; then
-			info
-		fi
-
-		if [ ${#warningmessage[@]} != 0 ]; then
-			warning
-		fi
-		if [ ${#abortmessage[@]} != 0 ]; then
-			abort
-		fi
-
 		if [ ${#componentvalues[@]} = 0 ] && [ ${#saltgrain[@]} != 0 ]; then
 			componentvalues=(${saltgrain[@]})
-
 		fi
-		if [ $previewFlag ] || [ $skipconfirmationFlag ] ; then
-			noconfirm=true
-		fi
-		assignArrays "$component"
-		scrubArrays
-		logWildCards
-		
-		componentSummary
 		for x in ${targethostloopvalues[@]}; 
 		do
 			
@@ -1141,19 +1153,52 @@ parseArrays () {
 }
 
 function componentSummary () {
-	echo ""
-	printf 'Summary for component : %s\nOutput  : %s\n' "$component" "$localtargetdir"
-	printf '%s' "Hosts : "
-	printf '%s, ' "${targethostloopvalues[@]}"| cut -d "," -f 1-${#targethostloopvalues[@]}
-	printf 'Collect IPMI : %s\n'  "$ipmiFlag"
-	printf '%s \n' "====================================================="
-	printf '%s %s\n' "Commands    :" "$(parseArrays cmd)"
-	printf '%s %s\n' "Log Files   :" "$(parseArrays log)"
-	printf '%s %s\n' "Journalctl  :" "$(parseArrays jct)"
-	printf '%s %s\n' "Services    :" "$(parseArrays svc)"
-	printf '%s %s\n' "Configs     :" "$(parseArrays cfg)"
-	printf '%s \n' "-----------------------------------------------------"
-	echo ""
+
+        for y in ${componentvalues[@]};
+        do
+                component=$y
+                if [ $saltgrainsFlag ]; then
+                        hostsAssociatedWithSaltGrain "$component"
+                fi
+
+                if [ ${#infomessage[@]} != 0 ]; then
+                        info
+                fi
+
+                if [ ${#warningmessage[@]} != 0 ]; then
+                        warning
+                fi
+                if [ ${#abortmessage[@]} != 0 ]; then
+                        abort
+                fi
+
+                if [ ${#componentvalues[@]} = 0 ] && [ ${#saltgrain[@]} != 0 ]; then
+                        componentvalues=(${saltgrain[@]})
+
+                fi
+                if [ $previewFlag ] || [ $skipconfirmationFlag ] ; then
+                        noconfirm=true
+                fi
+                assignArrays "$component"
+                scrubArrays
+                logWildCards
+		green=$(tput setaf 2)
+		nocolor=$(tput sgr0)
+		yellow=$(tput setaf 3)
+		echo ""
+		printf '%s %s\n%s %s\n' "${yellow}Salt Grain    :${nocolor}" "${green}$component${nocolor}" "${yellow}Output        :${nocolor}" "${green}$localtargetdir${nocolor}"
+		printf '%s' "${yellow}Hosts         : ${nocolor}"
+		printf '%s, ' "${green}${targethostloopvalues[@]}${nocolor}"| cut -d "," -f 1-${#targethostloopvalues[@]}
+		printf '%s %s\n'  "${yellow}Collect IPMI  :${nocolor}" "${green}$ipmiFlag${nocolor}"
+		printf '%s \n' "====================================================="
+		printf '%s %s\n' "${yellow}Commands      :${nocolor}" "$(parseArrays cmd)"
+		printf '%s %s\n' "${yellow}Log Files     :${nocolor}" "$(parseArrays log)"
+		printf '%s %s\n' "${yellow}Journalctl    :${nocolor}" "$(parseArrays jct)"
+		printf '%s %s\n' "${yellow}Services      :${nocolor}" "$(parseArrays svc)"
+		printf '%s %s\n' "${yellow}Configs       :${nocolor}" "$(parseArrays cfg)"
+		printf '%s \n' "-----------------------------------------------------"
+		echo ""
+	done 
 	if [ ! $noconfirm ]; then
 		abortprompt
 	fi 
