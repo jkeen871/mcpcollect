@@ -225,6 +225,7 @@ function assignArrays {
 					"lsmod" \
 					"ntpq -p"\
 					"reclass-salt --top"\
+					"dpkg -l | grep -E 'salt|formula|reclass'"\
 				)
 	declare -g generalCfg=(		"/etc/hosts"\
 				)
