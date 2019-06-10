@@ -180,7 +180,7 @@ done
 
 if [ $OPTIND -eq 1 ]; then usage ; fi
 
-
+USER=`id -un`
 datestamp=`date '+%Y%m%d%H%M%S'`
 localbasedir="/tmp/mcpcollect-$USER"
 localtargetdir="$localbasedir/$confighost/$datestamp"
@@ -188,11 +188,11 @@ keystonercv3="/root/keystonercv3"
 keystonercv2="/root/keystonerc"
 remotebasedir="/tmp/mcpcollect-$USER"
 remotetargetdir="$remotebasedir/$datestamp"
+localhostdir="$HOME/mcpcollect/$confighost"
 green=$(tput setaf 2)
 yellow=$(tput setaf 3)
 nocolor=$(tput sgr0)
 red=$(tput setaf 1)
-
 
 function assignArrays {
 	component=$1
@@ -710,7 +710,6 @@ function collectFiles {
 	elif [ "$collectType" = "all" ]; then
 		sourceFile=("`echo ${Cfg[@]} ${Log[@]}`")
 	fi
-#sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar --ignore-failed-read -czf '$remotetargetdir'/'$tarname' '$sourceFile' >/dev/null 2>&1" >/dev/null 2>&1 ;scp -o StrictHostKeyChecking=no -r '$targethostIP':'$remotetargetdir'/'$tarname' '$localdestdir'/'
 sshCollectFiles='sudo salt "*'$targethost'*" cmd.run "mkdir -p '$remotetargetdir';tar --ignore-failed-read -czf '$remotetargetdir'/'$tarname' '$sourceFile' >/dev/null 2>&1" >/dev/null 2>&1'
 	if [ "${#sourceFile[@]}" > 0  ]; then
 		if [ $runlocalFlag ]; then
@@ -780,10 +779,10 @@ function transferResultsLocal {
 	#compress tmpdir and copy to localhost
         echo "Transferring $component results from $confighost to localhost..."
 	localdestdir="$localtargetdir/$targethost"
-	mkdir -p $localdestdir
+	mkdir -p $localhostdir
 	tarname="$targethost-$component-$datestamp.tar.gz"
 	ssh -q -o StrictHostKeyChecking=no $confighost "cd $remotetargetdir/$targethost;tar --ignore-failed-read -czf $tarname * >/dev/null 2>&1"
-	scp -q -o StrictHostKeyChecking=no -r $confighost:$remotetargetdir/$targethost/$tarname $localdestdir/
+	scp -q -o StrictHostKeyChecking=no -r $confighost:$remotetargetdir/$targethost/$tarname $localhostdir/
 }
 
 function executeRemoteCommands {
@@ -1177,7 +1176,12 @@ function componentSummary () {
 		nocolor=$(tput sgr0)
 		yellow=$(tput setaf 3)
 		echo ""
-		printf '%s %s\n%s %s\n' "${yellow}Salt Grain    :${nocolor}" "${green}$component${nocolor}" "${yellow}Output        :${nocolor}" "${green}$localtargetdir${nocolor}"
+		printf '%s %s\n%s %s' "${yellow}Salt Grain    :${nocolor}" "${green}$component${nocolor}" "${yellow}Output        :${nocolor}" 
+		if [ ! runlocalFlag=true ]; then
+			printf "${green}$localtargetdir${nocolor}\n"
+		else
+			printf "${green}$localhostdir${nocolor}\n"
+		fi
 		printf '%s' "${yellow}Hosts         : ${nocolor}"
 		printf '%s, ' "${green}${targethostloopvalues[@]}${nocolor}"| cut -d "," -f 1-${#targethostloopvalues[@]}
 		printf '%s %s\n'  "${yellow}Collect IPMI  :${nocolor}" "${green}$ipmiFlag${nocolor}"
