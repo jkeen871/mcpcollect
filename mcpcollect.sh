@@ -163,7 +163,7 @@ function usage {
 #                c) componentFlag=true; componentvalues+=("$OPTARG");;
 
 ipmiFlag=false
-while getopts "i:c:h:g::s:ayp" arg; do
+while getopts "i:c:h:g::s:aypl:" arg; do
         case $arg in
                 h) targetHostFlag=true;targethostvalues+=("$OPTARG");;
                 s) confighostFlag=true;runlocalFlag=true;confighost="$OPTARG";;
@@ -173,6 +173,7 @@ while getopts "i:c:h:g::s:ayp" arg; do
                 p) previewFlag=true;;
 		q) queryflag=true;;
 		i) ipmiFlag=true;IPMI=$OPTARG;;
+		l) localhostdirFlag=true;localhostdir=$OPTARG;;
 		*) usage;;
                 \?) usage;;
         esac
@@ -188,7 +189,9 @@ keystonercv3="/root/keystonercv3"
 keystonercv2="/root/keystonerc"
 remotebasedir="/tmp/mcpcollect-$USER"
 remotetargetdir="$remotebasedir/$datestamp"
-localhostdir="$HOME/mcpcollect/$confighost"
+if [ ! $localhostdirFlag ]; then
+	localhostdir="$HOME/Downloads/mcpcollect/$confighost/$datestamp"
+fi
 green=$(tput setaf 2)
 yellow=$(tput setaf 3)
 nocolor=$(tput sgr0)
@@ -779,6 +782,7 @@ function transferResultsLocal {
 	#compress tmpdir and copy to localhost
         echo "Transferring $component results from $confighost to localhost..."
 	localdestdir="$localtargetdir/$targethost"
+	localhostdir="$localhostdir/$targethost"
 	mkdir -p $localhostdir
 	tarname="$targethost-$component-$datestamp.tar.gz"
 	ssh -q -o StrictHostKeyChecking=no $confighost "cd $remotetargetdir/$targethost;tar --ignore-failed-read -czf $tarname * >/dev/null 2>&1"
